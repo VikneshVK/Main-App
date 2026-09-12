@@ -179,18 +179,19 @@ export function calculateGeneratorSizing(
     transientLoadInputs
   );
 
-  // Headroom: requiredPrimeKva = diversifiedKva / (1 - headroomPercent/100)
+  // Headroom: requiredPrime = diversified / (1 - headroomPercent/100)
+  // CRITICAL: Unrounded floating-point values are passed to matchGenerators to prevent lossy rounding
   const safeHeadroomRatio = Math.max(0.5, Math.min(0.95, 1 - config.headroomPercent / 100));
-  const requiredPrimeKva = round(
-    totalDiversifiedKva > 0 ? totalDiversifiedKva / safeHeadroomRatio : 0,
-    1
-  );
+  const requiredPrimeKva = totalDiversifiedKva > 0 ? totalDiversifiedKva / safeHeadroomRatio : 0;
+  const requiredPrimeKw = totalDiversifiedKw > 0 ? totalDiversifiedKw / safeHeadroomRatio : 0;
 
-  // Match generator from catalog
+  // Match generator from catalog enforcing BOTH kW and kVA continuous limits
   const { recommended, minimumAcceptable, heavyDuty } = matchGenerators(
     requiredPrimeKva,
+    requiredPrimeKw,
     transientResult.peakTransientKva,
     totalDiversifiedKva,
+    totalDiversifiedKw,
     catalog
   );
 
@@ -204,11 +205,17 @@ export function calculateGeneratorSizing(
   const continuousOperatingLimitKva = evalGenerator
     ? round(evalGenerator.primeKva * continuousLimitRatio, 2)
     : 0;
+  const continuousOperatingLimitKw = evalGenerator
+    ? round(evalGenerator.primeKw * continuousLimitRatio, 2)
+    : 0;
 
   // Continuous Load Utilization (% of Prime):
   // utilization = (operatingDemand / Prime) * 100
   const continuousLoadUtilizationPercent = evalGenerator && evalGenerator.primeKva > 0
     ? round((totalDiversifiedKva / evalGenerator.primeKva) * 100, 1)
+    : 0;
+  const continuousLoadUtilizationKwPercent = evalGenerator && evalGenerator.primeKw > 0
+    ? round((totalDiversifiedKw / evalGenerator.primeKw) * 100, 1)
     : 0;
 
   // Operating Margin to continuous operating limit:
@@ -216,10 +223,20 @@ export function calculateGeneratorSizing(
   const operatingMarginKva = evalGenerator
     ? round(continuousOperatingLimitKva - totalDiversifiedKva, 2)
     : 0;
+  const operatingMarginKw = evalGenerator
+    ? round(continuousOperatingLimitKw - totalDiversifiedKw, 2)
+    : 0;
 
   const operatingMarginPercent = evalGenerator && evalGenerator.primeKva > 0
     ? round((operatingMarginKva / evalGenerator.primeKva) * 100, 1)
     : 0;
+  const operatingMarginKwPercent = evalGenerator && evalGenerator.primeKw > 0
+    ? round((operatingMarginKw / evalGenerator.primeKw) * 100, 1)
+    : 0;
+
+  // Governing constraint: Active Power (kW) vs Apparent Power (kVA)
+  const governingConstraint: 'kW' | 'kVA' =
+    continuousLoadUtilizationKwPercent >= continuousLoadUtilizationPercent ? 'kW' : 'kVA';
 
   // availableHeadroomKva represents the operating margin to continuous limit
   const availableHeadroomKva = operatingMarginKva;
@@ -231,7 +248,9 @@ export function calculateGeneratorSizing(
     totalDiversifiedKva,
     transientResult.peakTransientKva,
     operatingMarginKva,
-    config.headroomPercent
+    config.headroomPercent,
+    totalDiversifiedKw,
+    operatingMarginKw
   );
 
   // Compile Explicit Stated Assumptions for quotation & legal defensibility
@@ -311,11 +330,17 @@ export function calculateGeneratorSizing(
       peakTransientKva: transientResult.peakTransientKva,
 
       headroomPercent: config.headroomPercent,
-      requiredPrimeKva,
+      requiredPrimeKva: round(requiredPrimeKva, 2),
+      requiredPrimeKw: round(requiredPrimeKw, 2),
       continuousOperatingLimitKva,
+      continuousOperatingLimitKw,
       continuousLoadUtilizationPercent,
+      continuousLoadUtilizationKwPercent,
       operatingMarginKva,
+      operatingMarginKw,
       operatingMarginPercent,
+      operatingMarginKwPercent,
+      governingConstraint,
       availableHeadroomKva,
 
       recommendedGenerator: recommended,

@@ -38,11 +38,18 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
 
   // Calculate percentage utilization
   const continuousLimitPercent = 100 - summary.headroomPercent;
-  const isOverLimit = summary.operatingMarginKva < 0;
-  const marginBarWidth = Math.max(
-    0,
-    continuousLimitPercent - summary.continuousLoadUtilizationPercent
-  );
+  const isOverLimit =
+    summary.operatingMarginKva < 0 ||
+    (summary.operatingMarginKw !== undefined && summary.operatingMarginKw < 0);
+  const governingIsKw = summary.governingConstraint === 'kW';
+  const governingUtilization = governingIsKw
+    ? (summary.continuousLoadUtilizationKwPercent ?? summary.continuousLoadUtilizationPercent)
+    : summary.continuousLoadUtilizationPercent;
+  const governingMargin = governingIsKw
+    ? (summary.operatingMarginKw ?? summary.operatingMarginKva)
+    : summary.operatingMarginKva;
+  const governingUnit = governingIsKw ? 'kW' : 'kVA';
+  const marginBarWidth = Math.max(0, continuousLimitPercent - governingUtilization);
 
   const confidenceBadge = {
     High: {
@@ -108,58 +115,67 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
 
         {/* Headroom / Capacity Bar */}
         <div className="mt-5 space-y-2.5">
-          <div className="flex flex-wrap items-center justify-between text-xs font-medium text-gray-700 dark:text-gray-300 gap-y-1">
-            <span>
-              Operating Demand:{' '}
-              <strong className="text-gray-900 dark:text-white">
-                {summary.totalDiversifiedKva} kVA
-              </strong>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+              Continuous Operating Limits ({continuousLimitPercent}% Prime Limit)
             </span>
-            <span>
-              Continuous Limit ({continuousLimitPercent}%):{' '}
-              <strong className="text-gray-900 dark:text-white">
-                {summary.continuousOperatingLimitKva} kVA
-              </strong>
-            </span>
-            <span>
-              Prime Rating:{' '}
-              <strong className="text-gray-900 dark:text-white">
-                {recommended.primeKva} kVA
-              </strong>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+              Governing: {governingIsKw ? 'Active Power (kW)' : 'Apparent Power (kVA)'}
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between text-xs font-semibold pt-1 border-t border-gray-200/60 dark:border-gray-700/40">
-            <span className="text-gray-600 dark:text-gray-300">
-              Continuous Load Utilization:{' '}
-              <strong
-                className={
-                  isOverLimit
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-amber-600 dark:text-amber-400'
-                }
-              >
-                {summary.continuousLoadUtilizationPercent}% of Prime
-              </strong>
-            </span>
-            <span
-              className={
-                isOverLimit
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-emerald-600 dark:text-emerald-400'
-              }
-            >
-              Operating Margin to {continuousLimitPercent}% Prime Limit:{' '}
-              <strong>
-                {summary.operatingMarginKva > 0
-                  ? `+${summary.operatingMarginKva}`
-                  : summary.operatingMarginKva}{' '}
-                kVA
-              </strong>
-            </span>
+          {/* Dual kW and kVA Metrics Table / Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            {/* Apparent Power (kVA) Card */}
+            <div className={`p-2.5 rounded-xl border ${!governingIsKw ? 'border-amber-400 bg-amber-50/40 dark:bg-amber-950/20' : 'border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30'}`}>
+              <div className="flex items-center justify-between font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                <span>Apparent Power (kVA)</span>
+                {!governingIsKw && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase">Governing</span>}
+              </div>
+              <div className="space-y-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                <div className="flex justify-between">
+                  <span>Operating Demand:</span>
+                  <strong className="text-gray-900 dark:text-white">{summary.totalDiversifiedKva} kVA</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Continuous Limit:</span>
+                  <strong className="text-gray-900 dark:text-white">{summary.continuousOperatingLimitKva} kVA</strong>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-gray-200/50 dark:border-gray-700/50">
+                  <span>Margin ({summary.continuousLoadUtilizationPercent}% Prime):</span>
+                  <strong className={summary.operatingMarginKva < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                    {summary.operatingMarginKva > 0 ? `+${summary.operatingMarginKva}` : summary.operatingMarginKva} kVA
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Power (kW) Card */}
+            <div className={`p-2.5 rounded-xl border ${governingIsKw ? 'border-amber-400 bg-amber-50/40 dark:bg-amber-950/20' : 'border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30'}`}>
+              <div className="flex items-center justify-between font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                <span>Active Power (kW)</span>
+                {governingIsKw && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase">Governing</span>}
+              </div>
+              <div className="space-y-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                <div className="flex justify-between">
+                  <span>Operating Demand:</span>
+                  <strong className="text-gray-900 dark:text-white">{summary.totalDiversifiedKw} kW</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Continuous Limit:</span>
+                  <strong className="text-gray-900 dark:text-white">{summary.continuousOperatingLimitKw} kW</strong>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-gray-200/50 dark:border-gray-700/50">
+                  <span>Margin ({summary.continuousLoadUtilizationKwPercent}% Prime):</span>
+                  <strong className={summary.operatingMarginKw < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                    {summary.operatingMarginKw > 0 ? `+${summary.operatingMarginKw}` : summary.operatingMarginKw} kW
+                  </strong>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Visual Progress Bar */}
+          {/* Visual Progress Bar (Governing) */}
           <div className="h-3 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden flex p-0.5 relative">
             {/* 1. Demand segment */}
             <div
@@ -167,16 +183,16 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
                 isOverLimit ? 'bg-red-500' : 'bg-amber-500'
               }`}
               style={{
-                width: `${Math.min(100, summary.continuousLoadUtilizationPercent)}%`,
+                width: `${Math.min(100, governingUtilization)}%`,
               }}
-              title={`Demand: ${summary.continuousLoadUtilizationPercent}% of Prime`}
+              title={`Governing Demand (${governingUnit}): ${governingUtilization}% of Prime`}
             />
             {/* 2. Margin segment up to continuous limit */}
             {marginBarWidth > 0 && (
               <div
                 className="h-full bg-emerald-400/80 dark:bg-emerald-500/60 transition-all duration-300 ml-0.5"
                 style={{ width: `${marginBarWidth}%` }}
-                title={`Operating Margin: ${summary.operatingMarginKva} kVA before ${continuousLimitPercent}% limit`}
+                title={`Operating Margin: ${governingMargin} ${governingUnit} before ${continuousLimitPercent}% limit`}
               />
             )}
             {/* 3. Reserved Headroom buffer */}
@@ -190,9 +206,9 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
           <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
             <span>0%</span>
             <span className="text-gray-500 dark:text-gray-400 font-medium">
-              ▲ {continuousLimitPercent}% Limit ({summary.continuousOperatingLimitKva} kVA)
+              ▲ {continuousLimitPercent}% Limit ({governingIsKw ? `${summary.continuousOperatingLimitKw} kW` : `${summary.continuousOperatingLimitKva} kVA`})
             </span>
-            <span>100% Prime ({recommended.primeKva} kVA)</span>
+            <span>100% Prime ({governingIsKw ? `${recommended.primeKw} kW` : `${recommended.primeKva} kVA`})</span>
           </div>
         </div>
       </div>

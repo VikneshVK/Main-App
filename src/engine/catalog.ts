@@ -17,6 +17,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 15,
     standbyKva: 16.5,
     primeKw: 12,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 245000,
@@ -32,6 +33,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 20,
     standbyKva: 22,
     primeKw: 16,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 285000,
@@ -47,6 +49,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 25,
     standbyKva: 27.5,
     primeKw: 20,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 325000,
@@ -62,6 +65,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 30,
     standbyKva: 33,
     primeKw: 24,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 380000,
@@ -77,6 +81,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 40,
     standbyKva: 44,
     primeKw: 32,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 440000,
@@ -92,6 +97,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 50,
     standbyKva: 55,
     primeKw: 40,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 495000,
@@ -107,6 +113,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 62.5,
     standbyKva: 68.75,
     primeKw: 50,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 565000,
@@ -122,6 +129,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 82.5,
     standbyKva: 90,
     primeKw: 66,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 660000,
@@ -137,6 +145,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 100,
     standbyKva: 110,
     primeKw: 80,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 750000,
@@ -152,6 +161,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 125,
     standbyKva: 137.5,
     primeKw: 100,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 895000,
@@ -167,6 +177,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 160,
     standbyKva: 176,
     primeKw: 128,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 1140000,
@@ -182,6 +193,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 200,
     standbyKva: 220,
     primeKw: 160,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 1400000,
@@ -197,6 +209,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 250,
     standbyKva: 275,
     primeKw: 200,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 1720000,
@@ -212,6 +225,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 320,
     standbyKva: 352,
     primeKw: 256,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 2180000,
@@ -227,6 +241,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 400,
     standbyKva: 440,
     primeKw: 320,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 2780000,
@@ -242,6 +257,7 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKva: 500,
     standbyKva: 550,
     primeKw: 400,
+    ratedPowerFactor: 0.8,
     phase: 3,
     voltage: '415V 3-Phase',
     basePrice: 3480000,
@@ -252,13 +268,16 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
 
 /**
  * Matches generators based on:
- * 1. Required continuous Prime kVA (incorporating headroom reserve)
+ * 1. Required continuous Prime kVA & Prime kW (incorporating headroom reserve)
  * 2. Peak transient starting kVA capability (SKVA at 30% voltage dip)
+ * 3. Minimum running kVA & kW coverage
  */
 export function matchGenerators(
   requiredPrimeKva: number,
+  requiredPrimeKw: number,
   peakTransientKva: number,
   minimumRunningKva: number,
+  minimumRunningKw: number,
   catalog: GeneratorModel[] = STANDARD_GENERATOR_CATALOG
 ): {
   recommended: GeneratorModel | null;
@@ -269,25 +288,33 @@ export function matchGenerators(
     .filter((g) => g.isActive)
     .sort((a, b) => a.primeKva - b.primeKva);
 
-  if (activeCatalog.length === 0 || requiredPrimeKva <= 0) {
+  if (activeCatalog.length === 0 || (requiredPrimeKva <= 0 && requiredPrimeKw <= 0)) {
     return { recommended: null, minimumAcceptable: null, heavyDuty: null };
   }
 
-  // Minimum acceptable: smallest generator that covers running load and transient surge
+  // Minimum acceptable: smallest generator that covers running load (both kVA and kW) and transient surge
   let minimumAcceptable: GeneratorModel | null = null;
   for (const gen of activeCatalog) {
-    if (gen.primeKva >= minimumRunningKva && gen.transientCapacityKva >= peakTransientKva) {
+    if (
+      gen.primeKva >= minimumRunningKva &&
+      gen.primeKw >= minimumRunningKw &&
+      gen.transientCapacityKva >= peakTransientKva
+    ) {
       minimumAcceptable = gen;
       break;
     }
   }
 
-  // Recommended: satisfies BOTH requiredPrimeKva (with headroom) AND peak transient surge
+  // Recommended: satisfies BOTH requiredPrimeKva & requiredPrimeKw (with headroom) AND peak transient surge
   let recommended: GeneratorModel | null = null;
   let recommendedIndex = -1;
   for (let i = 0; i < activeCatalog.length; i++) {
     const gen = activeCatalog[i];
-    if (gen.primeKva >= requiredPrimeKva && gen.transientCapacityKva >= peakTransientKva) {
+    if (
+      gen.primeKva >= requiredPrimeKva &&
+      gen.primeKw >= requiredPrimeKw &&
+      gen.transientCapacityKva >= peakTransientKva
+    ) {
       recommended = gen;
       recommendedIndex = i;
       break;

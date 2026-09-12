@@ -13,8 +13,10 @@ export function evaluateConfidence(
   recommendedGen: GeneratorModel | null,
   diversifiedKva: number,
   peakTransientKva: number,
-  _headroomKva: number,
-  headroomPercent: number
+  operatingMarginKva: number,
+  headroomPercent: number,
+  diversifiedKw: number = 0,
+  operatingMarginKw: number = 0
 ): ConfidenceEvaluation {
   const warnings: string[] = [];
   const rationale: string[] = [];
@@ -53,7 +55,11 @@ export function evaluateConfidence(
 
   // Check generator sizing coverage & build rationale
   if (recommendedGen) {
-    rationale.push(`Handles calculated running requirement (${round(diversifiedKva, 1)} kVA)`);
+    rationale.push(
+      diversifiedKw > 0
+        ? `Handles calculated running requirement (${round(diversifiedKva, 1)} kVA / ${round(diversifiedKw, 1)} kW)`
+        : `Handles calculated running requirement (${round(diversifiedKva, 1)} kVA)`
+    );
     
     if (peakTransientKva > diversifiedKva) {
       rationale.push(`Accommodates peak starting demand (${round(peakTransientKva, 1)} kVA max surge)`);
@@ -65,7 +71,6 @@ export function evaluateConfidence(
     const continuousOperatingLimit = round(recommendedGen.primeKva * continuousLimitRatio, 2);
     const continuousLimitPercent = Math.round(continuousLimitRatio * 100);
     const utilizationPercent = round((diversifiedKva / recommendedGen.primeKva) * 100, 1);
-    const operatingMarginKva = round(continuousOperatingLimit - diversifiedKva, 2);
 
     if (operatingMarginKva > 0) {
       rationale.push(
@@ -84,6 +89,26 @@ export function evaluateConfidence(
         `Continuous loading alert: Operating demand (${round(diversifiedKva, 1)} kVA) exceeds the ${continuousLimitPercent}% continuous limit (${continuousOperatingLimit} kVA).`
       );
       score -= 20;
+    }
+
+    if (diversifiedKw > 0 && recommendedGen.primeKw > 0) {
+      const continuousOperatingLimitKw = round(recommendedGen.primeKw * continuousLimitRatio, 2);
+      const utilizationKwPercent = round((diversifiedKw / recommendedGen.primeKw) * 100, 1);
+
+      if (operatingMarginKw < 0) {
+        const deficitKw = round(Math.abs(operatingMarginKw), 2);
+        rationale.push(
+          `Operates at ${utilizationKwPercent}% of Prime kW capacity, exceeding the ${continuousLimitPercent}% continuous engine limit by ${deficitKw} kW.`
+        );
+        warnings.push(
+          `Continuous loading alert: Operating active load (${round(diversifiedKw, 1)} kW) exceeds the ${continuousLimitPercent}% continuous limit (${continuousOperatingLimitKw} kW).`
+        );
+        score -= 20;
+      } else {
+        rationale.push(
+          `Active power margin: ${operatingMarginKw} kW remaining before ${continuousLimitPercent}% continuous engine limit (${utilizationKwPercent}% Prime kW loading).`
+        );
+      }
     }
 
     // Check if starting surge is close to transient limit

@@ -63,6 +63,7 @@ export interface GeneratorModel {
   primeKva: number;
   standbyKva: number;
   primeKw: number;
+  ratedPowerFactor?: number; // default 0.8
   phase: number; // 1 or 3
   voltage: string; // e.g. '415V 3-Phase'
   basePrice?: number;
@@ -136,10 +137,16 @@ export interface SizingResult {
     // Headroom & Continuous Operating Limits
     headroomPercent: number;
     requiredPrimeKva: number;
+    requiredPrimeKw: number;
     continuousOperatingLimitKva: number;
-    continuousLoadUtilizationPercent: number;
+    continuousOperatingLimitKw: number;
+    continuousLoadUtilizationPercent: number; // kVA utilization %
+    continuousLoadUtilizationKwPercent: number; // kW utilization %
     operatingMarginKva: number;
+    operatingMarginKw: number;
     operatingMarginPercent: number;
+    operatingMarginKwPercent: number;
+    governingConstraint: 'kW' | 'kVA';
     availableHeadroomKva: number; // Kept for backwards compatibility (equals operatingMarginKva)
     
     // Recommendations
