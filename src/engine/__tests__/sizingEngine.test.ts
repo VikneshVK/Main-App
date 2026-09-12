@@ -702,6 +702,60 @@ describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () 
       expect(result.summary.continuousLoadUtilizationKwPercent).toBe(75.0); // 15 / 20 * 100
       expect(result.summary.continuousLoadUtilizationPercent).toBe(64.1); // 16.02 / 25 * 100
       expect(result.summary.governingConstraint).toBe('kW');
+
+      // 4. Verify Alternative Generator Qualification Audit
+      // 20 kVA generator fails continuous criteria and must NOT be labelled Minimum Acceptable
+      expect(result.summary.minimumAcceptableGenerator).toBeNull();
+      expect(result.summary.undersizedGenerator?.id).toBe('gen-20');
+      expect(result.summary.alternativeComparisons.lower).toBeDefined();
+      expect(result.summary.alternativeComparisons.lower?.qualifies).toBe(false);
+      expect(result.summary.alternativeComparisons.lower?.label).toBe('Undersized / Not Recommended');
+      expect(result.summary.alternativeComparisons.lower?.failureReason).toContain(
+        'Exceeds 80% continuous engine limit by 2.2 kW'
+      );
+      // All displayed operating margins must respect the 80% continuous Prime limits
+      expect(result.summary.alternativeComparisons.lower?.operatingMarginKw).toBe(-2.2);
+      expect(result.summary.alternativeComparisons.lower?.operatingMarginKva).toBe(-0.02);
+
+      // Heavy Duty (30 kVA) margins respect 80% continuous Prime limits (24 kW / 30 kVA limit: 19.2 kW / 24 kVA)
+      expect(result.summary.alternativeComparisons.heavyDuty?.generator.primeKva).toBe(30);
+      expect(result.summary.alternativeComparisons.heavyDuty?.qualifies).toBe(true);
+      expect(result.summary.alternativeComparisons.heavyDuty?.operatingMarginKw).toBe(4.2); // 19.2 - 15.0
+      expect(result.summary.alternativeComparisons.heavyDuty?.operatingMarginKva).toBe(7.98); // 24.0 - 16.02
+    });
+
+    it('Scenario 6: Alternative Generator Qualification - Only labels Minimum Acceptable if it passes continuous limits', () => {
+      // Create a test where smaller generator passes mandatory continuous limits
+      // e.g. 8 kW load at 0.8 PF (Demand: 8 kW / 10 kVA). Headroom = 20% (Continuous limit = 80%).
+      // Required: 8 / 0.8 = 10 kW; 10 / 0.8 = 12.5 kVA.
+      // gen-15 (Prime 12 kW / 15 kVA; limits 9.6 kW / 12 kVA).
+      // 8 kW <= 9.6 kW and 10 kVA <= 12 kVA -> gen-15 PASSES.
+      const load: LoadItem[] = [
+        {
+          id: 'test-small-load',
+          name: 'Small Load',
+          category: 'Custom',
+          quantity: 1,
+          unitPower: 8,
+          powerUnit: 'kW',
+          powerFactor: 0.8,
+          isMotor: false,
+          startingMethod: 'None',
+          confidence: 'Nameplate',
+          demandFactor: 1.0,
+        },
+      ];
+
+      const result = calculateGeneratorSizing(load, { headroomPercent: 20 });
+      expect(result.summary.recommendedGenerator?.id).toBe('gen-15');
+      // gen-15 is lowest in catalog, so lower alternative is null
+      expect(result.summary.alternativeComparisons.lower).toBeNull();
+      expect(result.summary.alternativeComparisons.heavyDuty?.generator.id).toBe('gen-20');
+      expect(result.summary.alternativeComparisons.heavyDuty?.qualifies).toBe(true);
+      // Continuous limit of gen-20 (16 kW / 20 kVA) at 80%: 12.8 kW / 16.0 kVA
+      // Margin to 80% limit: 12.8 - 8 = 4.8 kW; 16.0 - 10 = 6.0 kVA
+      expect(result.summary.alternativeComparisons.heavyDuty?.operatingMarginKw).toBe(4.8);
+      expect(result.summary.alternativeComparisons.heavyDuty?.operatingMarginKva).toBe(6.0);
     });
   });
 });

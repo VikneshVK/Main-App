@@ -8,6 +8,8 @@ import {
   EngineRulesetSnapshot,
   LoadCategory,
   StartingMethod,
+  AlternativeComparisonItem,
+  AlternativeComparisons,
 } from './types';
 import {
   normalizeToKw,
@@ -34,6 +36,78 @@ export const DEFAULT_SIZING_CONFIG: SizingConfig = {
   defaultMotorEfficiency: 0.85,
   transientSurgeMultiplier: 1.85,
 };
+
+/**
+ * Evaluates a candidate generator alternative against the exact same
+ * mandatory continuous operating limits (both kW and kVA) and transient surge.
+ */
+export function evaluateAlternativeCandidate(
+  gen: GeneratorModel | null,
+  demandKw: number,
+  demandKva: number,
+  peakTransientKva: number,
+  headroomPercent: number,
+  role: 'lower' | 'recommended' | 'heavyDuty'
+): AlternativeComparisonItem | null {
+  if (!gen) return null;
+
+  const continuousLimitRatio = 1 - headroomPercent / 100;
+  const continuousLimitPercent = Math.round(continuousLimitRatio * 100);
+  const continuousLimitKva = round(gen.primeKva * continuousLimitRatio, 2);
+  const continuousLimitKw = round(gen.primeKw * continuousLimitRatio, 2);
+
+  const operatingMarginKva = round(continuousLimitKva - demandKva, 2);
+  const operatingMarginKw = round(continuousLimitKw - demandKw, 2);
+  const transientMargin = round(gen.transientCapacityKva - peakTransientKva, 2);
+
+  const failureReasons: string[] = [];
+  if (operatingMarginKw < 0) {
+    const deficitKw = round(Math.abs(operatingMarginKw), 2);
+    failureReasons.push(
+      `Exceeds ${continuousLimitPercent}% continuous engine limit by ${deficitKw} kW (Limit: ${continuousLimitKw} kW, Demand: ${round(demandKw, 2)} kW)`
+    );
+  }
+  if (operatingMarginKva < 0) {
+    const deficitKva = round(Math.abs(operatingMarginKva), 2);
+    failureReasons.push(
+      `Exceeds ${continuousLimitPercent}% continuous kVA limit by ${deficitKva} kVA (Limit: ${continuousLimitKva} kVA, Demand: ${round(demandKva, 2)} kVA)`
+    );
+  }
+  if (transientMargin < 0) {
+    failureReasons.push(
+      `Peak starting surge (${round(peakTransientKva, 1)} kVA) exceeds alternator transient capacity (${gen.transientCapacityKva} SKVA)`
+    );
+  }
+
+  const qualifies = failureReasons.length === 0;
+
+  const kwUtilization = gen.primeKw > 0 ? demandKw / gen.primeKw : 0;
+  const kvaUtilization = gen.primeKva > 0 ? demandKva / gen.primeKva : 0;
+  const governingConstraint: 'kW' | 'kVA' = kwUtilization >= kvaUtilization ? 'kW' : 'kVA';
+  const governingMargin = governingConstraint === 'kW' ? operatingMarginKw : operatingMarginKva;
+
+  let label: 'Minimum Acceptable' | 'Undersized / Not Recommended' | 'Recommended' | 'Heavy-Duty / Future';
+  if (role === 'recommended') {
+    label = 'Recommended';
+  } else if (role === 'heavyDuty') {
+    label = 'Heavy-Duty / Future';
+  } else {
+    label = qualifies ? 'Minimum Acceptable' : 'Undersized / Not Recommended';
+  }
+
+  return {
+    generator: gen,
+    qualifies,
+    label,
+    continuousLimitKva,
+    continuousLimitKw,
+    operatingMarginKva,
+    operatingMarginKw,
+    governingMargin,
+    governingConstraint,
+    failureReason: failureReasons.length > 0 ? failureReasons.join('; ') : undefined,
+  };
+}
 
 /**
  * Master sizing engine orchestrator.
@@ -186,7 +260,7 @@ export function calculateGeneratorSizing(
   const requiredPrimeKw = totalDiversifiedKw > 0 ? totalDiversifiedKw / safeHeadroomRatio : 0;
 
   // Match generator from catalog enforcing BOTH kW and kVA continuous limits
-  const { recommended, minimumAcceptable, heavyDuty } = matchGenerators(
+  const { recommended, minimumAcceptable, heavyDuty, smallerCandidate, runningLoadCandidate } = matchGenerators(
     requiredPrimeKva,
     requiredPrimeKw,
     transientResult.peakTransientKva,
@@ -195,9 +269,51 @@ export function calculateGeneratorSizing(
     catalog
   );
 
+  // Evaluate alternative candidates under the exact same continuous operating limit rules
+  const lowerAlternative = evaluateAlternativeCandidate(
+    smallerCandidate,
+    totalDiversifiedKw,
+    totalDiversifiedKva,
+    transientResult.peakTransientKva,
+    config.headroomPercent,
+    'lower'
+  );
+
+  const recommendedAlternative = evaluateAlternativeCandidate(
+    recommended,
+    totalDiversifiedKw,
+    totalDiversifiedKva,
+    transientResult.peakTransientKva,
+    config.headroomPercent,
+    'recommended'
+  );
+
+  const heavyDutyAlternative = evaluateAlternativeCandidate(
+    heavyDuty,
+    totalDiversifiedKw,
+    totalDiversifiedKva,
+    transientResult.peakTransientKva,
+    config.headroomPercent,
+    'heavyDuty'
+  );
+
+  const alternativeComparisons: AlternativeComparisons = {
+    lower: lowerAlternative,
+    recommended: recommendedAlternative,
+    heavyDuty: heavyDutyAlternative,
+  };
+
+  // An alternative can ONLY be designated 'Minimum Acceptable' if it passes all mandatory qualification criteria.
+  // If the smaller candidate fails, it must NOT be labelled Minimum Acceptable.
+  const resolvedMinimumAcceptable =
+    lowerAlternative && lowerAlternative.qualifies ? lowerAlternative.generator : minimumAcceptable;
+
+  const undersizedGenerator =
+    lowerAlternative && !lowerAlternative.qualifies ? lowerAlternative.generator : null;
+
   // The generator evaluated for continuous headroom is the recommended unit,
-  // or the minimum acceptable unit if no generator satisfies the full headroom reserve.
-  const evalGenerator = recommended ?? minimumAcceptable;
+  // or the running load candidate if no generator satisfies the full headroom reserve.
+  const evalGenerator = recommended ?? runningLoadCandidate ?? resolvedMinimumAcceptable;
 
   // Continuous operating limit based on Prime capacity and headroom setting:
   // continuousLimit = Prime * (1 - headroomPercent/100)
@@ -344,8 +460,10 @@ export function calculateGeneratorSizing(
       availableHeadroomKva,
 
       recommendedGenerator: recommended,
-      minimumAcceptableGenerator: minimumAcceptable,
+      minimumAcceptableGenerator: resolvedMinimumAcceptable,
       heavyDutyGenerator: heavyDuty,
+      undersizedGenerator,
+      alternativeComparisons,
 
       confidence: confidenceEval.level,
       confidenceScore: confidenceEval.score,

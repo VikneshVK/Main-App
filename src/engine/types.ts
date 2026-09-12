@@ -111,6 +111,25 @@ export interface EngineRulesetSnapshot {
   activeStartingMultipliers: Record<StartingMethod, number>;
 }
 
+export interface AlternativeComparisonItem {
+  generator: GeneratorModel;
+  qualifies: boolean;
+  label: 'Minimum Acceptable' | 'Undersized / Not Recommended' | 'Recommended' | 'Heavy-Duty / Future';
+  continuousLimitKva: number;
+  continuousLimitKw: number;
+  operatingMarginKva: number;
+  operatingMarginKw: number;
+  governingMargin: number;
+  governingConstraint: 'kW' | 'kVA';
+  failureReason?: string;
+}
+
+export interface AlternativeComparisons {
+  lower: AlternativeComparisonItem | null;
+  recommended: AlternativeComparisonItem | null;
+  heavyDuty: AlternativeComparisonItem | null;
+}
+
 export interface SizingResult {
   summary: {
     engineVersion: string;
@@ -149,10 +168,12 @@ export interface SizingResult {
     governingConstraint: 'kW' | 'kVA';
     availableHeadroomKva: number; // Kept for backwards compatibility (equals operatingMarginKva)
     
-    // Recommendations
+    // Recommendations & Catalog Alternatives
     recommendedGenerator: GeneratorModel | null;
     minimumAcceptableGenerator: GeneratorModel | null;
     heavyDutyGenerator: GeneratorModel | null;
+    undersizedGenerator: GeneratorModel | null;
+    alternativeComparisons: AlternativeComparisons;
     
     // Confidence & Rationale
     confidence: ConfidenceLevel;

@@ -283,29 +283,37 @@ export function matchGenerators(
   recommended: GeneratorModel | null;
   minimumAcceptable: GeneratorModel | null;
   heavyDuty: GeneratorModel | null;
+  smallerCandidate: GeneratorModel | null;
+  runningLoadCandidate: GeneratorModel | null;
 } {
   const activeCatalog = catalog
     .filter((g) => g.isActive)
     .sort((a, b) => a.primeKva - b.primeKva);
 
   if (activeCatalog.length === 0 || (requiredPrimeKva <= 0 && requiredPrimeKw <= 0)) {
-    return { recommended: null, minimumAcceptable: null, heavyDuty: null };
+    return {
+      recommended: null,
+      minimumAcceptable: null,
+      heavyDuty: null,
+      smallerCandidate: null,
+      runningLoadCandidate: null,
+    };
   }
 
-  // Minimum acceptable: smallest generator that covers running load (both kVA and kW) and transient surge
-  let minimumAcceptable: GeneratorModel | null = null;
+  // Running load candidate: smallest unit that can physically carry the running load & transient surge
+  let runningLoadCandidate: GeneratorModel | null = null;
   for (const gen of activeCatalog) {
     if (
       gen.primeKva >= minimumRunningKva &&
       gen.primeKw >= minimumRunningKw &&
       gen.transientCapacityKva >= peakTransientKva
     ) {
-      minimumAcceptable = gen;
+      runningLoadCandidate = gen;
       break;
     }
   }
 
-  // Recommended: satisfies BOTH requiredPrimeKva & requiredPrimeKw (with headroom) AND peak transient surge
+  // Recommended: first generator that satisfies BOTH requiredPrimeKva & requiredPrimeKw (with headroom) AND peak transient surge
   let recommended: GeneratorModel | null = null;
   let recommendedIndex = -1;
   for (let i = 0; i < activeCatalog.length; i++) {
@@ -321,15 +329,30 @@ export function matchGenerators(
     }
   }
 
-  // Heavy duty / expansion alternative: next size step up
+  // Smaller candidate model (if one exists below the recommended index)
+  let smallerCandidate: GeneratorModel | null = null;
+  if (recommendedIndex > 0) {
+    smallerCandidate = activeCatalog[recommendedIndex - 1];
+  } else if (recommendedIndex === -1 && runningLoadCandidate) {
+    smallerCandidate = runningLoadCandidate;
+  }
+
+  // Heavy duty / expansion alternative: next size step up from recommended
   let heavyDuty: GeneratorModel | null = null;
   if (recommendedIndex >= 0 && recommendedIndex + 1 < activeCatalog.length) {
     heavyDuty = activeCatalog[recommendedIndex + 1];
   }
 
+  // An alternative can ONLY be designated 'Minimum Acceptable' if it passes all mandatory criteria.
+  // Because recommended is already the smallest generator that passes all mandatory criteria,
+  // any smaller candidate fails and must NOT be labelled Minimum Acceptable.
+  const minimumAcceptable: GeneratorModel | null = null;
+
   return {
     recommended,
-    minimumAcceptable: minimumAcceptable ?? recommended,
+    minimumAcceptable,
     heavyDuty,
+    smallerCandidate,
+    runningLoadCandidate,
   };
 }
