@@ -1139,7 +1139,7 @@ describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () 
         // Flagged Incompatible with explanation
         expect(result.breakdown[0].phaseStatus).toBe('Incompatible');
         expect(result.breakdown[0].phaseStatusReason).toContain('Incompatible with Single-Phase');
-        expect(result.breakdown[0].phaseStatusReason).toContain('3-phase motor cannot operate on a 230V single-phase supply');
+        expect(result.breakdown[0].phaseStatusReason).toContain('3-phase motor cannot operate on a 230 V single-phase supply');
 
         // Audit reflects incompatibility
         expect(result.summary.phaseAudit.hasIncompatibleLoads).toBe(true);
@@ -1171,7 +1171,7 @@ describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () 
         });
 
         expect(result.breakdown[0].phaseStatus).toBe('Incompatible');
-        expect(result.breakdown[0].phaseStatusReason).toContain('Star-Delta starting method requires a 3-phase supply');
+        expect(result.breakdown[0].phaseStatusReason).toContain('Star-Delta starter requires a 3-phase supply');
         expect(result.summary.phaseAudit.hasIncompatibleLoads).toBe(true);
       });
 

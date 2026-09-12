@@ -123,7 +123,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
             {recommended.isProvisional && (
               <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/70 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-[11px] font-medium border border-amber-300 dark:border-amber-800">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                <span>Provisional Reference Model — Preliminary test data pending OEM datasheet</span>
+                <span>Provisional Reference Data — Pending OEM Datasheet</span>
               </div>
             )}
 

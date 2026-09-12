@@ -146,21 +146,21 @@ export function resolveLoadPhaseAndCompatibility(
       return {
         inferredPhase: 'three',
         phaseStatus: 'Incompatible',
-        phaseStatusReason: `Incompatible with Single-Phase: Star-Delta starting method requires a 3-phase supply and cannot operate on a single-phase AC circuit.`,
+        phaseStatusReason: `Incompatible with Single-Phase: Star-Delta starter requires a 3-phase supply and cannot operate on a single-phase AC circuit.`,
       };
     }
     if (inferredPhase === 'three') {
       return {
         inferredPhase,
         phaseStatus: 'Incompatible',
-        phaseStatusReason: `Incompatible with Single-Phase: 3-phase motor cannot operate on a ${system.voltage}V single-phase supply.`,
+        phaseStatusReason: `Incompatible with Single-Phase: 3-phase motor cannot operate on a ${system.voltage} V single-phase supply.`,
       };
     }
     if (inferredPhase === 'unknown') {
       return {
         inferredPhase,
         phaseStatus: 'Requires Verification',
-        phaseStatusReason: `Requires Phase Verification: Equipment phase is unconfirmed. Theoretical demand is budgeted, but field verification of single-phase vs 3-phase nameplate is required before final quotation.`,
+        phaseStatusReason: `Requires Phase Verification: Equipment phase is unconfirmed. Verify single-phase vs 3-phase nameplate before final quotation.`,
       };
     }
     return {
@@ -174,7 +174,7 @@ export function resolveLoadPhaseAndCompatibility(
     return {
       inferredPhase,
       phaseStatus: 'Requires Verification',
-      phaseStatusReason: `Requires Phase Verification: Equipment phase is unconfirmed. Theoretical demand is budgeted, but field verification of single-phase vs 3-phase nameplate is required before final quotation.`,
+      phaseStatusReason: `Requires Phase Verification: Equipment phase is unconfirmed. Verify single-phase vs 3-phase nameplate before final quotation.`,
     };
   }
 
