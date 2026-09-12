@@ -6,6 +6,7 @@ import {
   Plus,
   Minus,
   CheckCircle2,
+  XCircle,
   Zap,
 } from 'lucide-react';
 import { ProcessedLoadItem, LoadItem } from '../../engine';
@@ -76,7 +77,8 @@ export const LoadTable: React.FC<LoadTableProps> = ({
               <th className="py-3 px-4">Qty / Rating</th>
               <th className="py-3 px-4">Starting Method</th>
               <th className="py-3 px-4 text-right">Running Load</th>
-              <th className="py-3 px-4 text-center">Status</th>
+              <th className="py-3 px-4 text-center">Phase Audit</th>
+              <th className="py-3 px-4 text-center">Data Confidence</th>
               <th className="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
@@ -89,7 +91,11 @@ export const LoadTable: React.FC<LoadTableProps> = ({
                 <tr
                   key={item.id}
                   className={`hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors ${
-                    isTbd ? 'bg-amber-50/30 dark:bg-amber-950/10' : ''
+                    p.phaseStatus === 'Incompatible'
+                      ? 'bg-red-50/40 dark:bg-red-950/20'
+                      : isTbd || p.phaseStatus === 'Requires Verification'
+                      ? 'bg-amber-50/30 dark:bg-amber-950/10'
+                      : ''
                   }`}
                 >
                   {/* Load Description */}
@@ -97,8 +103,22 @@ export const LoadTable: React.FC<LoadTableProps> = ({
                     <div className="font-semibold text-gray-900 dark:text-white">
                       {item.name}
                     </div>
-                    <div className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                    <div className="text-[11px] text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-1.5">
                       <span>{item.category}</span>
+                      {item.phase && (
+                        <>
+                          <span>•</span>
+                          <span className="font-mono text-[10px] px-1 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                            {item.phase === 'three'
+                              ? '3-Phase'
+                              : item.phase === 'single'
+                              ? '1-Phase'
+                              : item.phase === 'any'
+                              ? 'Universal'
+                              : 'Phase Unspecified'}
+                          </span>
+                        </>
+                      )}
                       {item.notes && (
                         <>
                           <span>•</span>
@@ -106,6 +126,11 @@ export const LoadTable: React.FC<LoadTableProps> = ({
                         </>
                       )}
                     </div>
+                    {p.phaseStatusReason && (
+                      <div className={`text-[10px] mt-0.5 font-medium ${p.phaseStatus === 'Incompatible' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                        {p.phaseStatusReason}
+                      </div>
+                    )}
                   </td>
 
                   {/* Quantity & Rating */}
@@ -158,18 +183,47 @@ export const LoadTable: React.FC<LoadTableProps> = ({
                           {p.effectiveRunningKw} kW
                         </div>
                         <div className="text-[11px] text-gray-500 dark:text-gray-400">
-                          {p.effectiveRunningKva} kVA @ PF {item.powerFactor}
+                          {p.effectiveRunningKva} kVA ({p.currentAmps} A)
                         </div>
                       </div>
                     )}
                   </td>
 
-                  {/* Status Badge */}
+                  {/* Phase Compatibility Audit */}
+                  <td className="py-3 px-4 text-center whitespace-nowrap">
+                    {p.phaseStatus === 'Incompatible' ? (
+                      <span
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800"
+                        title={p.phaseStatusReason}
+                      >
+                        <XCircle className="w-3.5 h-3.5 text-red-500" />
+                        Incompatible
+                      </span>
+                    ) : p.phaseStatus === 'Requires Verification' ? (
+                      <span
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
+                        title={p.phaseStatusReason}
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                        Needs Verification
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                        title="Confirmed compatible with active electrical system"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        Compatible
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Confidence Badge */}
                   <td className="py-3 px-4 text-center whitespace-nowrap">
                     {isTbd ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
                         <AlertTriangle className="w-3.5 h-3.5" />
-                        ■ Information required
+                        ■ Info required
                       </span>
                     ) : item.confidence === 'Nameplate' ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">

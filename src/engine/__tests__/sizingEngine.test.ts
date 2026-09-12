@@ -5,9 +5,13 @@ import {
   kwToKva,
   vectorPowerSum,
   calculateStartingKva,
+  calculateCurrentAmps,
+  currentToKva,
   LoadItem,
   GeneratorModel,
   CURRENT_ENGINE_VERSION,
+  PRODUCTION_THREE_PHASE_CATALOG,
+  PROVISIONAL_SINGLE_PHASE_CATALOG,
 } from '../index';
 
 describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () => {
@@ -313,6 +317,8 @@ describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () 
       standbyKva: 15,
       primeKw: 9.6,
       phase: 3,
+      supportedPhases: ['three'],
+      catalogStatus: 'production_verified',
       voltage: '415V 3-Phase',
       transientCapacityKva: 24,
       isActive: true,
@@ -326,6 +332,8 @@ describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () 
       standbyKva: 110,
       primeKw: 80,
       phase: 3,
+      supportedPhases: ['three'],
+      catalogStatus: 'production_verified',
       voltage: '415V 3-Phase',
       transientCapacityKva: 190,
       isActive: true,
@@ -480,6 +488,8 @@ describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () 
       primeKw: 16,
       ratedPowerFactor: 0.8,
       phase: 3,
+      supportedPhases: ['three'],
+      catalogStatus: 'production_verified',
       voltage: '415V 3-Phase',
       transientCapacityKva: 36,
       isActive: true,
@@ -494,6 +504,8 @@ describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () 
       primeKw: 20,
       ratedPowerFactor: 0.8,
       phase: 3,
+      supportedPhases: ['three'],
+      catalogStatus: 'production_verified',
       voltage: '415V 3-Phase',
       transientCapacityKva: 46,
       isActive: true,
@@ -853,4 +865,545 @@ describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () 
       expect(heavyDuty?.operatingMarginKva).toBe(10.23); // 24.0 - 13.77
     });
   });
+
+  describe('Phase Selection & Equipment Phase Governance (3-Phase vs Single-Phase)', () => {
+    describe('3-Phase Permanent Validation & Regression Suite (Cases A through F)', () => {
+      it('Case A: 15 HP Star-Delta motor -> recommends 30 kVA generator', () => {
+        const loads: LoadItem[] = [
+          {
+            id: 'case-a',
+            name: '15 HP Motor',
+            category: 'Motors',
+            quantity: 1,
+            unitPower: 15,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            efficiency: 0.85,
+            isMotor: true,
+            startingMethod: 'StarDelta',
+            confidence: 'Nameplate',
+            phase: 'three',
+          },
+        ];
+
+        const result = calculateGeneratorSizing(loads, {
+          electricalSystem: { phase: 'three', voltage: 415, frequency: 50 },
+        });
+
+        expect(result.summary.recommendedGenerator?.id).toBe('gen-30');
+        expect(result.summary.recommendedGenerator?.primeKva).toBe(30);
+        expect(result.summary.electricalSystem.phase).toBe('three');
+        expect(result.summary.electricalSystem.voltage).toBe(415);
+      });
+
+      it('Case B: 15 HP DOL motor -> recommends 62.5 kVA generator', () => {
+        const loads: LoadItem[] = [
+          {
+            id: 'case-b',
+            name: '15 HP Motor',
+            category: 'Motors',
+            quantity: 1,
+            unitPower: 15,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            efficiency: 0.85,
+            isMotor: true,
+            startingMethod: 'DOL',
+            confidence: 'Nameplate',
+            phase: 'three',
+          },
+        ];
+
+        const result = calculateGeneratorSizing(loads, {
+          electricalSystem: { phase: 'three', voltage: 415, frequency: 50 },
+        });
+
+        expect(result.summary.recommendedGenerator?.id).toBe('gen-62.5');
+        expect(result.summary.recommendedGenerator?.primeKva).toBe(62.5);
+      });
+
+      it('Case C: 10 kW heater + 10 HP DOL motor -> recommends 40 kVA generator', () => {
+        const loads: LoadItem[] = [
+          {
+            id: 'c-heater',
+            name: '10 kW Heater',
+            category: 'General',
+            quantity: 1,
+            unitPower: 10,
+            powerUnit: 'kW',
+            powerFactor: 1.0,
+            isMotor: false,
+            startingMethod: 'None',
+            confidence: 'Nameplate',
+            phase: 'any',
+          },
+          {
+            id: 'c-motor',
+            name: '10 HP DOL Motor',
+            category: 'Motors',
+            quantity: 1,
+            unitPower: 10,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            efficiency: 0.85,
+            isMotor: true,
+            startingMethod: 'DOL',
+            confidence: 'Nameplate',
+            phase: 'three',
+          },
+        ];
+
+        const result = calculateGeneratorSizing(loads, {
+          facilityType: 'Office',
+          applyDiversity: true,
+          electricalSystem: { phase: 'three', voltage: 415, frequency: 50 },
+        });
+
+        expect(result.summary.recommendedGenerator?.id).toBe('gen-40');
+        expect(result.summary.recommendedGenerator?.primeKva).toBe(40);
+      });
+
+      it('Case D: 2 × 5 HP DOL motors (Simultaneous ATS block start) -> recommends 40 kVA generator', () => {
+        const loads: LoadItem[] = [
+          {
+            id: 'd-motor',
+            name: '5 HP DOL Motor',
+            category: 'Motors',
+            quantity: 2,
+            unitPower: 5,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            efficiency: 0.85,
+            isMotor: true,
+            startingMethod: 'DOL',
+            confidence: 'Nameplate',
+            phase: 'three',
+          },
+        ];
+
+        const result = calculateGeneratorSizing(loads, {
+          motorStartingSequence: 'Simultaneous',
+          electricalSystem: { phase: 'three', voltage: 415, frequency: 50 },
+        });
+
+        expect(result.summary.recommendedGenerator?.id).toBe('gen-40');
+        expect(result.summary.recommendedGenerator?.primeKva).toBe(40);
+      });
+
+      it('Case E: 10 kW heater + 5 HP DOL + 7.5 HP Star-Delta (No Diversity) -> recommends 40 kVA generator', () => {
+        const loads: LoadItem[] = [
+          {
+            id: 'e-heater',
+            name: '10 kW Heater',
+            category: 'General',
+            quantity: 1,
+            unitPower: 10,
+            powerUnit: 'kW',
+            powerFactor: 1.0,
+            isMotor: false,
+            startingMethod: 'None',
+            confidence: 'Nameplate',
+            phase: 'any',
+          },
+          {
+            id: 'e-dol',
+            name: '5 HP DOL Motor',
+            category: 'Motors',
+            quantity: 1,
+            unitPower: 5,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            efficiency: 0.85,
+            isMotor: true,
+            startingMethod: 'DOL',
+            confidence: 'Nameplate',
+            phase: 'three',
+          },
+          {
+            id: 'e-sd',
+            name: '7.5 HP Star-Delta Motor',
+            category: 'Motors',
+            quantity: 1,
+            unitPower: 7.5,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            efficiency: 0.85,
+            isMotor: true,
+            startingMethod: 'StarDelta',
+            confidence: 'Nameplate',
+            phase: 'three',
+          },
+        ];
+
+        const result = calculateGeneratorSizing(loads, {
+          applyDiversity: false,
+          electricalSystem: { phase: 'three', voltage: 415, frequency: 50 },
+        });
+
+        expect(result.summary.recommendedGenerator?.id).toBe('gen-40');
+        expect(result.summary.recommendedGenerator?.primeKva).toBe(40);
+      });
+
+      it('Case F: 3 × 5 HP DOL motors (Sequential start) -> recommends 25 kVA generator', () => {
+        const loads: LoadItem[] = [
+          {
+            id: 'f-motor',
+            name: '5 HP DOL Motor',
+            category: 'Motors',
+            quantity: 3,
+            unitPower: 5,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            efficiency: 0.85,
+            isMotor: true,
+            startingMethod: 'DOL',
+            confidence: 'Nameplate',
+            phase: 'three',
+          },
+        ];
+
+        const result = calculateGeneratorSizing(loads, {
+          motorStartingSequence: 'Sequential',
+          electricalSystem: { phase: 'three', voltage: 415, frequency: 50 },
+        });
+
+        expect(result.summary.recommendedGenerator?.id).toBe('gen-25');
+        expect(result.summary.recommendedGenerator?.primeKva).toBe(25);
+      });
+    });
+
+    describe('Phase Compatibility Status Hierarchy (Compatible / Requires Verification / Incompatible)', () => {
+      it('Unknown-Phase Motor: calculates theoretical load, flags Requires Verification, and docks confidence', () => {
+        const load: LoadItem[] = [
+          {
+            id: 'unknown-pump',
+            name: '5 HP Groundwater Pump',
+            category: 'Motors',
+            quantity: 1,
+            unitPower: 5,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            isMotor: true,
+            startingMethod: 'DOL',
+            confidence: 'Nameplate',
+            phase: 'unknown', // Unknown phase!
+          },
+        ];
+
+        const result = calculateGeneratorSizing(load, {
+          electricalSystem: { phase: 'three', voltage: 415, frequency: 50 },
+        });
+
+        // 1. Theoretical load is physically calculated into demand (not silently dropped)
+        expect(result.summary.totalConnectedKw).toBeCloseTo(4.39, 1);
+        expect(result.summary.totalDiversifiedKva).toBeGreaterThan(0);
+
+        // 2. Load status is 'Requires Verification'
+        expect(result.breakdown[0].phaseStatus).toBe('Requires Verification');
+        expect(result.breakdown[0].phaseStatusReason).toContain('Requires Phase Verification');
+
+        // 3. Phase audit tracks the item
+        expect(result.summary.phaseAudit.hasUnknownPhaseLoads).toBe(true);
+        expect(result.summary.phaseAudit.requiresVerificationCount).toBe(1);
+
+        // 4. Stated assumptions & warnings reflect unconfirmed phase
+        expect(
+          result.summary.statedAssumptions.some((a) => a.includes('unverified phase configurations'))
+        ).toBe(true);
+        expect(
+          result.summary.warnings.some((w) => w.includes('PHASE VERIFICATION REQUIRED'))
+        ).toBe(true);
+      });
+
+      it('3-Phase Motor on 230 V Single-Phase: flags Incompatible with Single-Phase', () => {
+        const load: LoadItem[] = [
+          {
+            id: '3p-motor',
+            name: '5 HP Industrial Blower',
+            category: 'Motors',
+            quantity: 1,
+            unitPower: 5,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            isMotor: true,
+            startingMethod: 'DOL',
+            confidence: 'Nameplate',
+            phase: 'three', // 3-phase motor!
+          },
+        ];
+
+        const result = calculateGeneratorSizing(load, {
+          electricalSystem: { phase: 'single', voltage: 230, frequency: 50 },
+        });
+
+        // Flagged Incompatible with explanation
+        expect(result.breakdown[0].phaseStatus).toBe('Incompatible');
+        expect(result.breakdown[0].phaseStatusReason).toContain('Incompatible with Single-Phase');
+        expect(result.breakdown[0].phaseStatusReason).toContain('3-phase motor cannot operate on a 230V single-phase supply');
+
+        // Audit reflects incompatibility
+        expect(result.summary.phaseAudit.hasIncompatibleLoads).toBe(true);
+        expect(result.summary.phaseAudit.incompatibleCount).toBe(1);
+        expect(result.summary.confidence).toBe('Low');
+        expect(
+          result.summary.warnings.some((w) => w.includes('ELECTRICAL INCOMPATIBILITY'))
+        ).toBe(true);
+      });
+
+      it('Star-Delta Motor on Single-Phase: flags Incompatible with Single-Phase', () => {
+        const load: LoadItem[] = [
+          {
+            id: 'sd-motor',
+            name: '10 HP Chiller Compressor',
+            category: 'Motors',
+            quantity: 1,
+            unitPower: 10,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            isMotor: true,
+            startingMethod: 'StarDelta', // Physically impossible on 1-Phase
+            confidence: 'Nameplate',
+          },
+        ];
+
+        const result = calculateGeneratorSizing(load, {
+          electricalSystem: { phase: 'single', voltage: 230, frequency: 50 },
+        });
+
+        expect(result.breakdown[0].phaseStatus).toBe('Incompatible');
+        expect(result.breakdown[0].phaseStatusReason).toContain('Star-Delta starting method requires a 3-phase supply');
+        expect(result.summary.phaseAudit.hasIncompatibleLoads).toBe(true);
+      });
+
+      it('Confirmed Single-Phase equipment on Single-Phase system: flags Compatible', () => {
+        const load: LoadItem[] = [
+          {
+            id: 'split-ac',
+            name: '1.5 Ton Split AC',
+            category: 'HVAC',
+            quantity: 2,
+            unitPower: 1.5,
+            powerUnit: 'kW',
+            powerFactor: 0.85,
+            isMotor: true,
+            startingMethod: 'Inverter',
+            confidence: 'Nameplate',
+            phase: 'single',
+          },
+          {
+            id: 'lights',
+            name: 'LED Battens',
+            category: 'Lighting',
+            quantity: 10,
+            unitPower: 20,
+            powerUnit: 'W',
+            powerFactor: 0.95,
+            isMotor: false,
+            startingMethod: 'None',
+            confidence: 'Nameplate',
+            phase: 'any',
+          },
+        ];
+
+        const result = calculateGeneratorSizing(load, {
+          electricalSystem: { phase: 'single', voltage: 230, frequency: 50 },
+        });
+
+        expect(result.breakdown[0].phaseStatus).toBe('Compatible');
+        expect(result.breakdown[1].phaseStatus).toBe('Compatible');
+        expect(result.summary.phaseAudit.compatibleCount).toBe(12);
+        expect(result.summary.phaseAudit.incompatibleCount).toBe(0);
+        expect(result.summary.phaseAudit.requiresVerificationCount).toBe(0);
+      });
+    });
+
+    describe('Provisional Single-Phase Catalog Isolation & Sizing', () => {
+      it('verifies catalog quarantine: production 3-phase models vs provisional single-phase models', () => {
+        expect(PRODUCTION_THREE_PHASE_CATALOG.length).toBe(16);
+        expect(
+          PRODUCTION_THREE_PHASE_CATALOG.every(
+            (g) => g.catalogStatus === 'production_verified' && g.supportedPhases.includes('three')
+          )
+        ).toBe(true);
+
+        expect(PROVISIONAL_SINGLE_PHASE_CATALOG.length).toBe(5);
+        expect(
+          PROVISIONAL_SINGLE_PHASE_CATALOG.every(
+            (g) => g.catalogStatus === 'provisional_reference' && g.isProvisional === true && g.supportedPhases.includes('single')
+          )
+        ).toBe(true);
+      });
+
+      it('sizes purely resistive single-phase load from provisional single-phase catalog', () => {
+        // 3 kW resistive load on 230V Single-Phase
+        // S = 3 kVA, I = 3000 / 230 = 13.0 A
+        // At 20% headroom: required Prime = 3 / 0.8 = 3.75 kVA / 3.75 kW
+        // DG-5 kVA 1Φ has Prime 5 kVA / 4 kW, transient 9.5 kVA -> QUALIFIES!
+        const load: LoadItem[] = [
+          {
+            id: 'resistive-1',
+            name: '3 kW Baseboard Heating',
+            category: 'General',
+            quantity: 1,
+            unitPower: 3,
+            powerUnit: 'kW',
+            powerFactor: 1.0,
+            isMotor: false,
+            startingMethod: 'None',
+            confidence: 'Nameplate',
+            phase: 'single',
+            demandFactor: 1.0,
+          },
+        ];
+
+        const result = calculateGeneratorSizing(load, {
+          applyDiversity: false,
+          electricalSystem: { phase: 'single', voltage: 230, frequency: 50 },
+        });
+
+        expect(result.summary.recommendedGenerator?.id).toBe('gen-1p-5');
+        expect(result.summary.recommendedGenerator?.primeKva).toBe(5);
+        expect(result.summary.recommendedGenerator?.isProvisional).toBe(true);
+        expect(result.summary.totalDiversifiedAmps).toBeCloseTo(13.0, 1);
+        expect(
+          result.summary.statedAssumptions.some((a) => a.includes('Single-Phase 230V'))
+        ).toBe(true);
+        expect(
+          result.summary.statedAssumptions.some((a) => a.includes('Provisional Reference Data'))
+        ).toBe(true);
+      });
+
+      it('sizes single-phase motor with starting inrush surge', () => {
+        // 2 HP single-phase motor
+        // Input kW = 2 * 0.7457 / 0.85 = 1.755 kW. Running kVA = 1.755 / 0.8 = 2.193 kVA.
+        // DOL multiplier = 6.0x -> Starting kVA = 2.193 * 6 = 13.16 kVA.
+        // DG-5 kVA has transientCapacityKva: 9.5 (< 13.16) -> FAILS transient surge!
+        // DG-7.5 kVA has transientCapacityKva: 14.0 (>= 13.16) -> QUALIFIES & RECOMMENDED!
+        const load: LoadItem[] = [
+          {
+            id: 'sp-motor',
+            name: '2 HP Sump Pump',
+            category: 'Motors',
+            quantity: 1,
+            unitPower: 2,
+            powerUnit: 'HP',
+            powerFactor: 0.8,
+            efficiency: 0.85,
+            isMotor: true,
+            startingMethod: 'DOL',
+            confidence: 'Nameplate',
+            phase: 'single',
+            demandFactor: 1.0,
+          },
+        ];
+
+        const result = calculateGeneratorSizing(load, {
+          applyDiversity: false,
+          electricalSystem: { phase: 'single', voltage: 230, frequency: 50 },
+        });
+
+        expect(result.summary.recommendedGenerator?.id).toBe('gen-1p-7.5');
+        expect(result.summary.recommendedGenerator?.primeKva).toBe(7.5);
+        expect(result.summary.peakTransientKva).toBeCloseTo(13.16, 1);
+      });
+
+      it('exceeding 15 kVA single-phase ceiling clearly warns no compatible generator exists', () => {
+        // 25 kW load on Single-Phase
+        const heavyLoad: LoadItem[] = [
+          {
+            id: 'heavy-load',
+            name: 'Commercial Kitchen Induction Range',
+            category: 'Appliances',
+            quantity: 1,
+            unitPower: 25,
+            powerUnit: 'kW',
+            powerFactor: 0.95,
+            isMotor: false,
+            startingMethod: 'None',
+            confidence: 'Nameplate',
+            phase: 'single',
+            demandFactor: 1.0,
+          },
+        ];
+
+        const result = calculateGeneratorSizing(heavyLoad, {
+          applyDiversity: false,
+          electricalSystem: { phase: 'single', voltage: 230, frequency: 50 },
+        });
+
+        // No single-phase DG exceeds 15 kVA
+        expect(result.summary.recommendedGenerator).toBeNull();
+        expect(
+          result.summary.statedAssumptions.some((a) =>
+            a.includes('Single-Phase Capacity Ceiling')
+          )
+        ).toBe(true);
+      });
+    });
+
+    describe('Electrical Math: Single-Phase vs 3-Phase Line Currents', () => {
+      it('calculates current accurately for 1-phase vs 3-phase', () => {
+        // Single-phase: I = (10 kVA * 1000) / 230 V = 43.48 A
+        expect(calculateCurrentAmps(10, 230, 'single')).toBe(43.5);
+
+        // Three-phase: I = (10 kVA * 1000) / (sqrt(3) * 415 V) = 13.91 A
+        expect(calculateCurrentAmps(10, 415, 'three')).toBe(13.9);
+
+        // Inverse calculation: currentToKva
+        expect(currentToKva(43.5, 230, 'single')).toBeCloseTo(10, 0);
+        expect(currentToKva(13.9, 415, 'three')).toBeCloseTo(10, 0);
+      });
+
+      it('switching between 3-phase and single-phase updates currents and recommendations dynamically', () => {
+        const mixedLoad: LoadItem[] = [
+          {
+            id: 'lights',
+            name: 'Office Lighting',
+            category: 'Lighting',
+            quantity: 50,
+            unitPower: 40,
+            powerUnit: 'W',
+            powerFactor: 0.95,
+            isMotor: false,
+            startingMethod: 'None',
+            confidence: 'Nameplate',
+            phase: 'any',
+          },
+          {
+            id: 'ac',
+            name: 'Split ACs',
+            category: 'HVAC',
+            quantity: 2,
+            unitPower: 1.5,
+            powerUnit: 'kW',
+            powerFactor: 0.85,
+            isMotor: true,
+            startingMethod: 'Inverter',
+            confidence: 'Nameplate',
+            phase: 'single',
+          },
+        ];
+
+        // 1. Evaluate on 3-Phase 415V
+        const result3P = calculateGeneratorSizing(mixedLoad, {
+          electricalSystem: { phase: 'three', voltage: 415, frequency: 50 },
+        });
+        expect(result3P.summary.recommendedGenerator?.phase).toBe(3);
+        expect(result3P.summary.recommendedGenerator?.supportedPhases).toContain('three');
+
+        // 2. Evaluate on Single-Phase 230V
+        const result1P = calculateGeneratorSizing(mixedLoad, {
+          electricalSystem: { phase: 'single', voltage: 230, frequency: 50 },
+        });
+        expect(result1P.summary.recommendedGenerator?.phase).toBe(1);
+        expect(result1P.summary.recommendedGenerator?.supportedPhases).toContain('single');
+
+        // Single-phase line current is higher than 3-phase line current for same kVA
+        expect(result1P.summary.totalConnectedAmps).toBeGreaterThan(
+          result3P.summary.totalConnectedAmps
+        );
+      });
+    });
+  });
 });
+

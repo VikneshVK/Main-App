@@ -36,6 +36,21 @@ export type FacilityType =
   | 'Healthcare'    // Hospital / Critical Health Care
   | 'Custom';       // Custom User Profile
 
+export type PhaseType = 'single' | 'three';
+
+export type LoadPhase = 'single' | 'three' | 'any' | 'unknown';
+
+export type PhaseCompatibilityStatus =
+  | 'Compatible'
+  | 'Requires Verification'
+  | 'Incompatible';
+
+export interface ElectricalSystem {
+  phase: PhaseType;
+  voltage: number; // default: 415 for 3-phase, 230 for single-phase
+  frequency: number; // default: 50 Hz
+}
+
 export interface LoadItem {
   id: string;
   name: string;
@@ -52,6 +67,7 @@ export interface LoadItem {
   confidence: LoadConfidence;
   demandFactor?: number; // optional custom demand factor (0.1 to 1.0)
   notes?: string;
+  phase?: LoadPhase; // default: 'unknown' for motors unless specified, 'any' for general
 }
 
 export interface GeneratorModel {
@@ -64,8 +80,11 @@ export interface GeneratorModel {
   standbyKva: number;
   primeKw: number;
   ratedPowerFactor?: number; // default 0.8
-  phase: number; // 1 or 3
-  voltage: string; // e.g. '415V 3-Phase'
+  phase: number; // 1 or 3 (kept for backward compatibility)
+  supportedPhases: PhaseType[]; // ['three'] or ['single'] or ['single', 'three']
+  catalogStatus: 'production_verified' | 'provisional_reference';
+  isProvisional?: boolean;
+  voltage: string; // e.g. '415V 3-Phase' or '230V 1-Phase'
   basePrice?: number;
   transientCapacityKva: number; // Alternator SKVA at 30% voltage dip
   isActive: boolean;
@@ -78,6 +97,7 @@ export interface SizingConfig {
   motorStartingSequence: MotorStartingSequence;
   defaultMotorEfficiency: number; // default 0.85
   transientSurgeMultiplier: number; // fallback multiplier if alternator SKVA unavailable
+  electricalSystem?: ElectricalSystem;
   customDemandFactors?: Partial<Record<LoadCategory, number>>;
   customStartingMultipliers?: Partial<Record<StartingMethod, number>>;
 }
@@ -97,12 +117,16 @@ export interface ProcessedLoadItem {
   startingMultiplier: number;
   unitStartingKva: number;
   totalStartingKva: number;
+  currentAmps: number;
+  phaseStatus: PhaseCompatibilityStatus;
+  phaseStatusReason?: string;
 }
 
 export interface EngineRulesetSnapshot {
   engineVersion: string;
   timestamp: string;
   standardsReference: string;
+  electricalSystem: ElectricalSystem;
   facilityType: FacilityType;
   motorStartingSequence: MotorStartingSequence;
   headroomPercent: number;
@@ -137,6 +161,18 @@ export interface SizingResult {
     totalLoadsCount: number;
     unknownLoadsCount: number;
     unknownLoadNames: string[];
+
+    // Electrical System & Currents
+    electricalSystem: ElectricalSystem;
+    totalConnectedAmps: number;
+    totalDiversifiedAmps: number;
+    phaseAudit: {
+      compatibleCount: number;
+      requiresVerificationCount: number;
+      incompatibleCount: number;
+      hasUnknownPhaseLoads: boolean;
+      hasIncompatibleLoads: boolean;
+    };
     
     // Connected (undiversified) totals
     totalConnectedKw: number;

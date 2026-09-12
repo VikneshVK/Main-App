@@ -12,15 +12,49 @@ import { SizingResult, GeneratorModel } from '../../engine';
 interface RecommendationCardProps {
   sizingResult: SizingResult;
   onSelectAlternative?: (gen: GeneratorModel) => void;
+  onSwitchToThreePhase?: () => void;
 }
 
 export const RecommendationCard: React.FC<RecommendationCardProps> = ({
   sizingResult,
+  onSwitchToThreePhase,
 }) => {
   const { summary } = sizingResult;
   const recommended = summary.recommendedGenerator;
 
   if (!recommended) {
+    if (summary.totalLoadsCount > 0) {
+      return (
+        <div className="bg-white dark:bg-[#181D26] rounded-2xl border border-red-200 dark:border-red-900/80 p-6 shadow-sm text-center transition-colors">
+          <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-gray-900 dark:text-white">
+            No Compatible {summary.electricalSystem.phase === 'single' ? 'Single-Phase' : '3-Phase'} Generator Available
+          </h3>
+          <p className="text-xs text-gray-600 dark:text-gray-300 mt-2 max-w-md mx-auto leading-relaxed">
+            {summary.electricalSystem.phase === 'single'
+              ? `Operating demand (${summary.totalDiversifiedKva} kVA / ${summary.totalDiversifiedKw} kW) exceeds the maximum commercial single-phase generator capacity (15 kVA / 12 kW). Single-phase utility services and commercial diesel sets are limited to 15 kVA.`
+              : `Total operating demand (${summary.totalDiversifiedKva} kVA / ${summary.totalDiversifiedKw} kW) or peak starting surge (${summary.peakTransientKva} kVA) exceeds the capacity of available catalog generators.`}
+          </p>
+          {summary.electricalSystem.phase === 'single' && (
+            <div className="mt-4 p-3.5 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/60 text-xs text-amber-800 dark:text-amber-300 block text-left">
+              <p>
+                <strong>Engineering Recommendation:</strong> Switch system to <strong>3-Phase (415V)</strong> to select from standard industrial generators (available up to 500 kVA).
+              </p>
+              {onSwitchToThreePhase && (
+                <button
+                  type="button"
+                  onClick={onSwitchToThreePhase}
+                  className="mt-2.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                >
+                  Switch System to 3-Phase (415V)
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="bg-white dark:bg-[#181D26] rounded-2xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm text-center">
         <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
@@ -70,7 +104,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
       <div className="p-6 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-br from-amber-50/40 via-transparent to-transparent dark:from-amber-950/20">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
               <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
                 <ShieldCheck className="w-4 h-4" />
                 Recommended Generator
@@ -80,7 +114,27 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
               >
                 {confidenceBadge.label} ({summary.confidenceScore}%)
               </span>
+              <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 font-mono">
+                {summary.electricalSystem.voltage}V {summary.electricalSystem.phase === 'single' ? '1-Phase' : '3-Phase'}
+              </span>
             </div>
+
+            {/* Provisional Model Tag */}
+            {recommended.isProvisional && (
+              <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/70 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-[11px] font-medium border border-amber-300 dark:border-amber-800">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>Provisional Reference Model — Preliminary test data pending OEM datasheet</span>
+              </div>
+            )}
+
+            {/* Phase Verification Required Tag */}
+            {summary.phaseAudit.hasUnknownPhaseLoads && (
+              <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 text-[11px] font-medium border border-blue-200 dark:border-blue-800">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                <span>Requires Phase Verification: Sizing includes unverified equipment nameplate(s)</span>
+              </div>
+            )}
+
             <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">
               {recommended.primeKva} kVA{' '}
               <span className="text-lg font-semibold text-gray-500 dark:text-gray-400">

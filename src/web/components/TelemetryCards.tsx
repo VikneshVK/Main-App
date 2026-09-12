@@ -59,9 +59,9 @@ export const TelemetryCards: React.FC<TelemetryCardsProps> = ({
             <span className="text-xs font-bold text-gray-500">kW</span>
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center justify-between">
-            <span>Apparent:</span>
+            <span>Apparent / Current:</span>
             <span className="font-semibold text-gray-700 dark:text-gray-300">
-              {summary.totalConnectedKva} kVA
+              {summary.totalConnectedKva} kVA ({summary.totalConnectedAmps} A)
             </span>
           </div>
         </div>
@@ -81,9 +81,9 @@ export const TelemetryCards: React.FC<TelemetryCardsProps> = ({
             <span className="text-xs font-bold text-gray-500">kVA</span>
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center justify-between">
-            <span>Active / Reactive:</span>
+            <span>Current / Power:</span>
             <span className="font-semibold text-gray-700 dark:text-gray-300">
-              {summary.totalDiversifiedKw} kW / {summary.totalDiversifiedKvar} kVAR
+              {summary.totalDiversifiedAmps} A • {summary.totalDiversifiedKw} kW
             </span>
           </div>
         </div>

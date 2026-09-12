@@ -7,8 +7,11 @@ import {
   MotorStartingSequence,
   LoadCategory,
   StartingMethod,
+  ElectricalSystem,
+  PhaseType,
 } from './engine';
 import { Navbar } from './web/components/Navbar';
+import { ElectricalSystemCard } from './web/components/ElectricalSystemCard';
 import { PresetsBar } from './web/components/PresetsBar';
 import { LoadTable } from './web/components/LoadTable';
 import { TelemetryCards } from './web/components/TelemetryCards';
@@ -125,6 +128,21 @@ export const App: React.FC = () => {
   // Load state - pre-populate with the PDF specification scenario
   const [loads, setLoads] = useState<LoadItem[]>(SPEC_SCENARIO_LOADS);
 
+  // Electrical Supply configuration
+  const [electricalSystem, setElectricalSystem] = useState<ElectricalSystem>({
+    phase: 'three',
+    voltage: 415,
+    frequency: 50,
+  });
+
+  const handlePhaseChange = (phase: PhaseType) => {
+    setElectricalSystem((prev) => ({
+      ...prev,
+      phase,
+      voltage: phase === 'single' ? 230 : 415,
+    }));
+  };
+
   // Engine configuration options
   const [headroomPercent, setHeadroomPercent] = useState<number>(20);
   const [applyDiversity, setApplyDiversity] = useState<boolean>(true);
@@ -155,6 +173,7 @@ export const App: React.FC = () => {
       motorStartingSequence,
       customDemandFactors,
       customStartingMultipliers,
+      electricalSystem,
     });
   }, [
     loads,
@@ -164,6 +183,7 @@ export const App: React.FC = () => {
     motorStartingSequence,
     customDemandFactors,
     customStartingMultipliers,
+    electricalSystem,
   ]);
 
   // Handlers
@@ -181,6 +201,7 @@ export const App: React.FC = () => {
       startingMethod: preset.startingMethod,
       confidence: preset.confidence,
       notes: preset.notes,
+      phase: preset.phase,
     };
     setLoads((prev) => [...prev, newItem]);
   };
@@ -244,6 +265,13 @@ export const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Electrical System Configuration */}
+        <ElectricalSystemCard
+          electricalSystem={electricalSystem}
+          onPhaseChange={handlePhaseChange}
+          sizingResult={sizingResult}
+        />
+
         {/* Presets Visual Bar */}
         <PresetsBar
           onAddPreset={handleAddPreset}
@@ -270,7 +298,10 @@ export const App: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left / Top: Recommendation & Rationale (5 cols) */}
           <div className="lg:col-span-5 space-y-4">
-            <RecommendationCard sizingResult={sizingResult} />
+            <RecommendationCard
+              sizingResult={sizingResult}
+              onSwitchToThreePhase={() => handlePhaseChange('three')}
+            />
           </div>
 
           {/* Right: Load Summary Table (7 cols) */}

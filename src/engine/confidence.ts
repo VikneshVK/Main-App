@@ -16,7 +16,13 @@ export function evaluateConfidence(
   operatingMarginKva: number,
   headroomPercent: number,
   diversifiedKw: number = 0,
-  operatingMarginKw: number = 0
+  operatingMarginKw: number = 0,
+  phaseAudit?: {
+    hasUnknownPhaseLoads: boolean;
+    hasIncompatibleLoads: boolean;
+    requiresVerificationCount: number;
+    incompatibleCount: number;
+  }
 ): ConfidenceEvaluation {
   const warnings: string[] = [];
   const rationale: string[] = [];
@@ -116,9 +122,37 @@ export function evaluateConfidence(
       warnings.push(`High motor starting surge: Peak transient (${round(peakTransientKva, 1)} kVA) reaches ${round((peakTransientKva / recommendedGen.transientCapacityKva) * 100)}% of alternator transient capability.`);
       score -= 10;
     }
+
+    // Check if provisional generator model is selected
+    if (recommendedGen.isProvisional) {
+      warnings.push(
+        'PROVISIONAL DATA: Sizing is based on provisional single-phase generator ratings pending OEM manufacturer datasheet confirmation.'
+      );
+      rationale.push('Provisional reference single-phase generator model matched.');
+      score -= 10;
+    }
   } else {
     warnings.push('No standard generator in the catalog is large enough to support the calculated load.');
     score = 10;
+  }
+
+  // Phase Governance Audits
+  if (phaseAudit) {
+    if (phaseAudit.hasIncompatibleLoads) {
+      warnings.push(
+        `ELECTRICAL INCOMPATIBILITY: ${phaseAudit.incompatibleCount} equipment item(s) are incompatible with the selected electrical system supply.`
+      );
+      score -= 40;
+    }
+    if (phaseAudit.hasUnknownPhaseLoads) {
+      warnings.push(
+        `PHASE VERIFICATION REQUIRED: ${phaseAudit.requiresVerificationCount} equipment item(s) have unverified phase configurations. Theoretical demand is budgeted, but field verification is required before final quotation.`
+      );
+      score -= 20;
+      rationale.push(
+        `${phaseAudit.requiresVerificationCount} equipment item(s) require single-phase vs 3-phase nameplate verification.`
+      );
+    }
   }
 
   // Unknown load reminder in rationale
@@ -131,9 +165,9 @@ export function evaluateConfidence(
   const finalScore = Math.max(10, Math.min(100, score));
   let level: ConfidenceLevel = 'High';
 
-  if (unknownLoads.length > 0 || finalScore < 60) {
+  if (unknownLoads.length > 0 || (phaseAudit && phaseAudit.hasIncompatibleLoads) || finalScore < 60) {
     level = 'Low';
-  } else if (finalScore < 85) {
+  } else if (finalScore < 85 || (phaseAudit && phaseAudit.hasUnknownPhaseLoads) || recommendedGen?.isProvisional) {
     level = 'Medium';
   }
 

@@ -18,6 +18,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Computer',
     defaultQty: 10,
     notes: 'PC desktop + 24" monitor',
+    phase: 'any',
   },
   {
     name: 'Split AC - 1.5 Ton',
@@ -31,6 +32,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Wind',
     defaultQty: 2,
     notes: '5-star inverter split air conditioner',
+    phase: 'single',
   },
   {
     name: 'Split AC - 2.0 Ton',
@@ -44,6 +46,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Wind',
     defaultQty: 1,
     notes: 'Inverter compressor',
+    phase: 'single',
   },
   {
     name: 'LED Tube Light',
@@ -57,6 +60,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Lightbulb',
     defaultQty: 20,
     notes: 'Standard 4ft LED batten',
+    phase: 'any',
   },
   {
     name: 'Ceiling Fan',
@@ -70,6 +74,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Fan',
     defaultQty: 6,
     notes: '1200mm standard ceiling fan',
+    phase: 'single',
   },
   {
     name: 'Water Motor (Groundwater / Borewell)',
@@ -84,6 +89,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Droplets',
     defaultQty: 1,
     notes: 'Submersible borewell pump',
+    phase: 'unknown',
   },
   {
     name: 'Water Motor (Unknown HP)',
@@ -98,6 +104,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'HelpCircle',
     defaultQty: 1,
     notes: 'Customer unaware of HP rating; flagged for site verification',
+    phase: 'unknown',
   },
   {
     name: 'Refrigerator (Commercial / Pantry)',
@@ -111,6 +118,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Box',
     defaultQty: 1,
     notes: '350L double door frost-free',
+    phase: 'single',
   },
   {
     name: 'Microwave Oven',
@@ -124,6 +132,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Flame',
     defaultQty: 1,
     notes: 'Commercial 28L convection',
+    phase: 'single',
   },
   {
     name: 'Coffee Maker / Espresso Machine',
@@ -137,6 +146,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Coffee',
     defaultQty: 1,
     notes: 'Commercial twin brew unit',
+    phase: 'single',
   },
   {
     name: 'Air Compressor (Industrial)',
@@ -151,6 +161,7 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Gauge',
     defaultQty: 1,
     notes: 'Two-stage reciprocating air compressor',
+    phase: 'three',
   },
   {
     name: 'CNC Milling Machine',
@@ -164,5 +175,6 @@ export const COMMON_LOAD_PRESETS: PresetTemplate[] = [
     iconName: 'Cpu',
     defaultQty: 1,
     notes: '3-Axis VMC with servo spindle',
+    phase: 'three',
   },
 ];

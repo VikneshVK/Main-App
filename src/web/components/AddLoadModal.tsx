@@ -6,6 +6,7 @@ import {
   PowerUnit,
   StartingMethod,
   LoadConfidence,
+  LoadPhase,
   STARTING_METHOD_DESCRIPTIONS,
 } from '../../engine';
 
@@ -28,6 +29,9 @@ export const AddLoadModal: React.FC<AddLoadModalProps> = ({
   const [unitPower, setUnitPower] = useState(initialItem?.unitPower ?? 1.5);
   const [powerUnit, setPowerUnit] = useState<PowerUnit>(initialItem?.powerUnit || 'kW');
   const [powerFactor, setPowerFactor] = useState(initialItem?.powerFactor || 0.85);
+  const [phase, setPhase] = useState<LoadPhase>(
+    initialItem?.phase || (initialItem ? (initialItem.isMotor ? 'unknown' : 'any') : 'unknown')
+  );
   const [isMotor, setIsMotor] = useState(initialItem?.isMotor ?? false);
   const [startingMethod, setStartingMethod] = useState<StartingMethod>(
     initialItem?.startingMethod || 'None'
@@ -63,6 +67,7 @@ export const AddLoadModal: React.FC<AddLoadModalProps> = ({
       nemaCodeLetter: isMotor && nemaCodeLetter ? nemaCodeLetter : undefined,
       confidence,
       notes: notes.trim() || undefined,
+      phase,
     };
 
     onSaveLoad(newItem);
@@ -186,6 +191,83 @@ export const AddLoadModal: React.FC<AddLoadModalProps> = ({
             )}
           </div>
 
+          {/* Equipment Phase Configuration */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Equipment Electrical Phase
+              </label>
+              <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                {phase === 'three' && '3-Phase 415V Supply'}
+                {phase === 'single' && 'Single-Phase 230V Circuit'}
+                {phase === 'any' && 'Universal / Balanced Across Phases'}
+                {phase === 'unknown' && 'Phase Unconfirmed (Requires Site Check)'}
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setPhase('three')}
+                className={`px-2 py-2 rounded-lg text-xs font-medium border text-center transition cursor-pointer ${
+                  phase === 'three'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                3-Phase
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPhase('single');
+                  if (startingMethod === 'StarDelta') {
+                    setStartingMethod('DOL');
+                  }
+                }}
+                className={`px-2 py-2 rounded-lg text-xs font-medium border text-center transition cursor-pointer ${
+                  phase === 'single'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                Single-Phase
+              </button>
+              <button
+                type="button"
+                onClick={() => setPhase('any')}
+                className={`px-2 py-2 rounded-lg text-xs font-medium border text-center transition cursor-pointer ${
+                  phase === 'any'
+                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                Universal
+              </button>
+              <button
+                type="button"
+                onClick={() => setPhase('unknown')}
+                className={`px-2 py-2 rounded-lg text-xs font-medium border text-center transition cursor-pointer ${
+                  phase === 'unknown'
+                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                Unknown (TBD)
+              </button>
+            </div>
+            {phase === 'unknown' && (
+              <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                Unconfirmed phase will be flagged as &quot;Requires Verification&quot; and docks quotation confidence.
+              </p>
+            )}
+            {phase === 'three' && (
+              <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                Requires 3-phase supply. Incompatible with 230V single-phase generator system.
+              </p>
+            )}
+          </div>
+
           {/* Power Rating & Unit (Only if not Unknown_TBD) */}
           {confidence !== 'Unknown_TBD' && (
             <div className="grid grid-cols-2 gap-3">
@@ -212,7 +294,10 @@ export const AddLoadModal: React.FC<AddLoadModalProps> = ({
                   onChange={(e) => {
                     const u = e.target.value as PowerUnit;
                     setPowerUnit(u);
-                    if (u === 'HP') setIsMotor(true);
+                    if (u === 'HP') {
+                      setIsMotor(true);
+                      if (phase === 'any') setPhase('unknown');
+                    }
                   }}
                   className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#12161F] text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-hidden"
                 >
@@ -268,8 +353,13 @@ export const AddLoadModal: React.FC<AddLoadModalProps> = ({
                 checked={isMotor}
                 onChange={(e) => {
                   setIsMotor(e.target.checked);
-                  if (e.target.checked && startingMethod === 'None') {
-                    setStartingMethod('DOL');
+                  if (e.target.checked) {
+                    if (startingMethod === 'None') {
+                      setStartingMethod('DOL');
+                    }
+                    if (phase === 'any') {
+                      setPhase('unknown');
+                    }
                   }
                 }}
                 className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 accent-amber-500"
@@ -290,11 +380,19 @@ export const AddLoadModal: React.FC<AddLoadModalProps> = ({
                   </label>
                   <select
                     value={startingMethod}
-                    onChange={(e) => setStartingMethod(e.target.value as StartingMethod)}
+                    onChange={(e) => {
+                      const method = e.target.value as StartingMethod;
+                      setStartingMethod(method);
+                      if (method === 'StarDelta' && phase === 'single') {
+                        setPhase('three');
+                      }
+                    }}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#12161F] text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-hidden"
                   >
                     <option value="DOL">Direct-On-Line (6.0x Starting Inrush)</option>
-                    <option value="StarDelta">Star-Delta (3.0x Starting Inrush)</option>
+                    <option value="StarDelta" disabled={phase === 'single'}>
+                      Star-Delta (3.0x Starting Inrush){phase === 'single' ? ' - 3-Phase Supply Only' : ''}
+                    </option>
                     <option value="SoftStarter">Electronic Soft Starter (2.0x Starting Inrush)</option>
                     <option value="VFD">Variable Frequency Drive (1.2x Soft Ramp)</option>
                     <option value="Inverter">Inverter Driven / BLDC (1.2x Modulated)</option>

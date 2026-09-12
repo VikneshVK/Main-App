@@ -10,12 +10,16 @@ import {
   StartingMethod,
   AlternativeComparisonItem,
   AlternativeComparisons,
+  ElectricalSystem,
+  PhaseCompatibilityStatus,
+  LoadPhase,
 } from './types';
 import {
   normalizeToKw,
   kwToKva,
   calculateKvar,
   vectorPowerSum,
+  calculateCurrentAmps,
   round,
 } from './electricalMath';
 import {
@@ -35,6 +39,11 @@ export const DEFAULT_SIZING_CONFIG: SizingConfig = {
   motorStartingSequence: 'Sequential',
   defaultMotorEfficiency: 0.85,
   transientSurgeMultiplier: 1.85,
+  electricalSystem: {
+    phase: 'three',
+    voltage: 415,
+    frequency: 50,
+  },
 };
 
 /**
@@ -111,6 +120,71 @@ export function evaluateAlternativeCandidate(
 }
 
 /**
+ * Resolves equipment phase and evaluates compatibility against the active electrical system.
+ */
+export function resolveLoadPhaseAndCompatibility(
+  item: LoadItem,
+  system: ElectricalSystem
+): {
+  inferredPhase: LoadPhase;
+  phaseStatus: PhaseCompatibilityStatus;
+  phaseStatusReason?: string;
+} {
+  // 1. Determine load phase
+  const inferredPhase: LoadPhase =
+    item.phase ??
+    (item.startingMethod === 'StarDelta'
+      ? 'three'
+      : item.isMotor
+      ? 'unknown'
+      : 'any');
+
+  // 2. Evaluate against active electrical system
+  if (system.phase === 'single') {
+    // Single-phase system rules (e.g. 230 V)
+    if (item.startingMethod === 'StarDelta') {
+      return {
+        inferredPhase: 'three',
+        phaseStatus: 'Incompatible',
+        phaseStatusReason: `Incompatible with Single-Phase: Star-Delta starting method requires a 3-phase supply and cannot operate on a single-phase AC circuit.`,
+      };
+    }
+    if (inferredPhase === 'three') {
+      return {
+        inferredPhase,
+        phaseStatus: 'Incompatible',
+        phaseStatusReason: `Incompatible with Single-Phase: 3-phase motor cannot operate on a ${system.voltage}V single-phase supply.`,
+      };
+    }
+    if (inferredPhase === 'unknown') {
+      return {
+        inferredPhase,
+        phaseStatus: 'Requires Verification',
+        phaseStatusReason: `Requires Phase Verification: Equipment phase is unconfirmed. Theoretical demand is budgeted, but field verification of single-phase vs 3-phase nameplate is required before final quotation.`,
+      };
+    }
+    return {
+      inferredPhase,
+      phaseStatus: 'Compatible',
+    };
+  }
+
+  // 3-Phase system rules (e.g. 415 V)
+  if (inferredPhase === 'unknown') {
+    return {
+      inferredPhase,
+      phaseStatus: 'Requires Verification',
+      phaseStatusReason: `Requires Phase Verification: Equipment phase is unconfirmed. Theoretical demand is budgeted, but field verification of single-phase vs 3-phase nameplate is required before final quotation.`,
+    };
+  }
+
+  return {
+    inferredPhase,
+    phaseStatus: 'Compatible',
+  };
+}
+
+/**
  * Master sizing engine orchestrator.
  * Takes raw customer load requirements and computes exact electrical metrics,
  * transient demand, catalog generator recommendations, stated disclosures,
@@ -121,9 +195,18 @@ export function calculateGeneratorSizing(
   customConfig?: Partial<SizingConfig>,
   catalog: GeneratorModel[] = STANDARD_GENERATOR_CATALOG
 ): SizingResult {
+  const electricalSystem: ElectricalSystem = {
+    phase: customConfig?.electricalSystem?.phase ?? 'three',
+    voltage:
+      customConfig?.electricalSystem?.voltage ??
+      (customConfig?.electricalSystem?.phase === 'single' ? 230 : 415),
+    frequency: customConfig?.electricalSystem?.frequency ?? 50,
+  };
+
   const config: SizingConfig = {
     ...DEFAULT_SIZING_CONFIG,
     ...customConfig,
+    electricalSystem,
   };
 
   const processedList: ProcessedLoadItem[] = [];
@@ -144,6 +227,7 @@ export function calculateGeneratorSizing(
 
   for (const item of loads) {
     const isUnknown = item.confidence === 'Unknown_TBD' || item.unitPower <= 0;
+    const phaseCheck = resolveLoadPhaseAndCompatibility(item, electricalSystem);
 
     if (isUnknown) {
       unknownLoadsCount += item.quantity;
@@ -166,6 +250,9 @@ export function calculateGeneratorSizing(
         startingMultiplier: resolveStartingMultiplier(item, config.customStartingMultipliers),
         unitStartingKva: 0,
         totalStartingKva: 0,
+        currentAmps: 0,
+        phaseStatus: phaseCheck.phaseStatus,
+        phaseStatusReason: phaseCheck.phaseStatusReason,
       });
       continue;
     }
@@ -189,6 +276,8 @@ export function calculateGeneratorSizing(
 
     totalConnectedKw += totalKw;
     totalConnectedKva += totalKva;
+
+    const currentAmps = calculateCurrentAmps(totalKva, electricalSystem.voltage, electricalSystem.phase);
 
     const demandFactor = resolveDemandFactor(
       item.category,
@@ -237,6 +326,9 @@ export function calculateGeneratorSizing(
       startingMultiplier,
       unitStartingKva: round(unitStartingKva, 2),
       totalStartingKva: round(totalStartingKva, 2),
+      currentAmps,
+      phaseStatus: phaseCheck.phaseStatus,
+      phaseStatusReason: phaseCheck.phaseStatusReason,
     });
   }
 
@@ -246,6 +338,33 @@ export function calculateGeneratorSizing(
   const totalDiversifiedKvar = vectorResult.totalKvar;
   const totalDiversifiedKva = vectorResult.totalKva;
   const systemPowerFactor = vectorResult.systemPf;
+
+  // Calculate system full-load line currents in Amperes
+  const totalConnectedAmps = calculateCurrentAmps(totalConnectedKva, electricalSystem.voltage, electricalSystem.phase);
+  const totalDiversifiedAmps = calculateCurrentAmps(totalDiversifiedKva, electricalSystem.voltage, electricalSystem.phase);
+
+  // Compile Phase Compatibility Governance Audit
+  let compatibleCount = 0;
+  let requiresVerificationCount = 0;
+  let incompatibleCount = 0;
+
+  for (const p of processedList) {
+    if (p.phaseStatus === 'Incompatible') {
+      incompatibleCount += p.item.quantity;
+    } else if (p.phaseStatus === 'Requires Verification') {
+      requiresVerificationCount += p.item.quantity;
+    } else {
+      compatibleCount += p.item.quantity;
+    }
+  }
+
+  const phaseAudit = {
+    compatibleCount,
+    requiresVerificationCount,
+    incompatibleCount,
+    hasUnknownPhaseLoads: requiresVerificationCount > 0,
+    hasIncompatibleLoads: incompatibleCount > 0,
+  };
 
   // Transient Peak starting demand based on chosen sequence mode
   const transientResult = calculatePeakTransientDemand(
@@ -260,14 +379,15 @@ export function calculateGeneratorSizing(
   const requiredPrimeKva = totalDiversifiedKva > 0 ? totalDiversifiedKva / safeHeadroomRatio : 0;
   const requiredPrimeKw = totalDiversifiedKw > 0 ? totalDiversifiedKw / safeHeadroomRatio : 0;
 
-  // Match generator from catalog enforcing BOTH kW and kVA continuous limits
+  // Match generator from catalog enforcing BOTH kW and kVA continuous limits and phase compatibility
   const { recommended, minimumAcceptable, heavyDuty, smallerCandidate, runningLoadCandidate } = matchGenerators(
     requiredPrimeKva,
     requiredPrimeKw,
     transientResult.peakTransientKva,
     totalDiversifiedKva,
     totalDiversifiedKw,
-    catalog
+    catalog,
+    electricalSystem.phase
   );
 
   // Evaluate alternative candidates under the exact same continuous operating limit rules
@@ -367,11 +487,22 @@ export function calculateGeneratorSizing(
     operatingMarginKva,
     config.headroomPercent,
     totalDiversifiedKw,
-    operatingMarginKw
+    operatingMarginKw,
+    phaseAudit
   );
 
   // Compile Explicit Stated Assumptions for quotation & legal defensibility
   const statedAssumptions: string[] = [];
+
+  if (electricalSystem.phase === 'single') {
+    statedAssumptions.push(
+      `Electrical Supply: Single-Phase ${electricalSystem.voltage}V, ${electricalSystem.frequency}Hz AC distribution system.`
+    );
+  } else {
+    statedAssumptions.push(
+      `Electrical Supply: 3-Phase ${electricalSystem.voltage}V, ${electricalSystem.frequency}Hz AC balanced distribution system.`
+    );
+  }
 
   if (config.motorStartingSequence === 'Sequential') {
     statedAssumptions.push(
@@ -397,6 +528,30 @@ export function calculateGeneratorSizing(
     );
   }
 
+  if (phaseAudit.hasIncompatibleLoads) {
+    statedAssumptions.push(
+      `CRITICAL ALERT: Site configuration contains ${phaseAudit.incompatibleCount} equipment item(s) incompatible with the ${electricalSystem.voltage}V ${electricalSystem.phase === 'single' ? 'Single-Phase' : '3-Phase'} system.`
+    );
+  }
+
+  if (phaseAudit.hasUnknownPhaseLoads) {
+    statedAssumptions.push(
+      `NOTICE: ${phaseAudit.requiresVerificationCount} equipment item(s) have unverified phase configurations. Theoretical demand is budgeted, but single-phase vs 3-phase nameplate verification is mandatory prior to quotation sign-off.`
+    );
+  }
+
+  if (recommended?.isProvisional) {
+    statedAssumptions.push(
+      `Provisional Reference Data: The recommended generator (${recommended.modelName}) is based on provisional single-phase catalog data pending manufacturer certified datasheets.`
+    );
+  }
+
+  if (electricalSystem.phase === 'single' && !recommended && loads.length > 0) {
+    statedAssumptions.push(
+      `Single-Phase Capacity Ceiling: Required demand (${round(totalDiversifiedKva, 1)} kVA / ${round(totalDiversifiedKw, 1)} kW) exceeds maximum single-phase generator capacity (15 kVA). Commercial installations of this size require 3-Phase 415V service.`
+    );
+  }
+
   if (unknownLoadsCount > 0) {
     statedAssumptions.push(
       `CAUTION: Includes ${unknownLoadsCount} unconfirmed equipment item(s) (${unknownLoadNames.join(', ')}) marked as Information Required. Recommendation is provisional and subject to nameplate verification.`
@@ -418,6 +573,7 @@ export function calculateGeneratorSizing(
     engineVersion: CURRENT_ENGINE_VERSION,
     timestamp: new Date().toISOString(),
     standardsReference: 'IEEE Std 399-1997 / NEMA MG 1-2016 / IEC 60947-4-1 / ISO 8528-5',
+    electricalSystem,
     facilityType: config.facilityType,
     motorStartingSequence: config.motorStartingSequence,
     headroomPercent: config.headroomPercent,
@@ -432,6 +588,12 @@ export function calculateGeneratorSizing(
       totalLoadsCount: loads.reduce((sum, item) => sum + item.quantity, 0),
       unknownLoadsCount,
       unknownLoadNames,
+
+      // Electrical System & Currents
+      electricalSystem,
+      totalConnectedAmps,
+      totalDiversifiedAmps,
+      phaseAudit,
 
       totalConnectedKw: round(totalConnectedKw, 2),
       totalConnectedKva: round(totalConnectedKva, 2),

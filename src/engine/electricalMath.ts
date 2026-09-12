@@ -1,4 +1,4 @@
-import { PowerUnit } from './types';
+import { PowerUnit, PhaseType } from './types';
 
 export const HP_TO_KW_FACTOR = 0.7457; // 1 Mechanical HP = 0.745699872 kW
 
@@ -81,4 +81,38 @@ export function vectorPowerSum(loads: Array<{ kw: number; kvar: number }>): {
     totalKva: round(totalKva, 2),
     systemPf: round(systemPf, 3),
   };
+}
+
+/**
+ * Calculates line current in Amperes:
+ * - Single-Phase: I = (kVA * 1000) / V
+ * - Three-Phase:  I = (kVA * 1000) / (sqrt(3) * V_line)
+ */
+export function calculateCurrentAmps(
+  kva: number,
+  voltage: number,
+  phase: PhaseType
+): number {
+  if (kva <= 0 || voltage <= 0) return 0;
+  if (phase === 'single') {
+    return round((kva * 1000) / voltage, 1);
+  }
+  return round((kva * 1000) / (Math.sqrt(3) * voltage), 1);
+}
+
+/**
+ * Calculates apparent power (kVA) from current in Amperes:
+ * - Single-Phase: S = (V * I) / 1000
+ * - Three-Phase:  S = (sqrt(3) * V_line * I) / 1000
+ */
+export function currentToKva(
+  currentAmps: number,
+  voltage: number,
+  phase: PhaseType
+): number {
+  if (currentAmps <= 0 || voltage <= 0) return 0;
+  if (phase === 'single') {
+    return round((voltage * currentAmps) / 1000, 2);
+  }
+  return round((Math.sqrt(3) * voltage * currentAmps) / 1000, 2);
 }

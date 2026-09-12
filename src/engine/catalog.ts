@@ -1,13 +1,13 @@
-import { GeneratorModel } from './types';
+import { GeneratorModel, PhaseType } from './types';
 
 /**
- * Standard generator catalog grounded in commercial CPCB IV+ DG sets
+ * Verified production 3-phase generator catalog grounded in commercial CPCB IV+ DG sets
  * equipped with Stamford / Leroy-Somer industrial brushless alternators.
  * 
  * Transient capacity values represent actual Motor Starting kVA (SKVA)
  * at 30% sustained voltage dip per Stamford S-Range & UC-Series factory datasheets.
  */
-export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
+export const PRODUCTION_THREE_PHASE_CATALOG: GeneratorModel[] = [
   {
     id: 'gen-15',
     modelName: 'DG-15 kVA (CPCB IV+)',
@@ -19,6 +19,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 12,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 245000,
     transientCapacityKva: 28, // 1.86x Prime @ 30% dip
@@ -35,6 +37,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 16,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 285000,
     transientCapacityKva: 36, // 1.8x Prime @ 30% dip
@@ -51,6 +55,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 20,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 325000,
     transientCapacityKva: 46, // 1.84x Prime @ 30% dip
@@ -67,6 +73,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 24,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 380000,
     transientCapacityKva: 56, // 1.87x Prime @ 30% dip
@@ -83,6 +91,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 32,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 440000,
     transientCapacityKva: 74, // 1.85x Prime @ 30% dip
@@ -99,6 +109,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 40,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 495000,
     transientCapacityKva: 92, // 1.84x Prime @ 30% dip
@@ -115,6 +127,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 50,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 565000,
     transientCapacityKva: 118, // 1.89x Prime @ 30% dip
@@ -131,6 +145,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 66,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 660000,
     transientCapacityKva: 154, // 1.87x Prime @ 30% dip
@@ -147,6 +163,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 80,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 750000,
     transientCapacityKva: 190, // 1.90x Prime @ 30% dip
@@ -163,6 +181,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 100,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 895000,
     transientCapacityKva: 238, // 1.90x Prime @ 30% dip
@@ -179,6 +199,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 128,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 1140000,
     transientCapacityKva: 305, // 1.90x Prime @ 30% dip
@@ -195,6 +217,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 160,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 1400000,
     transientCapacityKva: 380, // 1.90x Prime @ 30% dip
@@ -211,6 +235,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 200,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 1720000,
     transientCapacityKva: 480, // 1.92x Prime @ 30% dip
@@ -227,6 +253,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 256,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 2180000,
     transientCapacityKva: 610, // 1.90x Prime @ 30% dip
@@ -243,6 +271,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 320,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 2780000,
     transientCapacityKva: 760, // 1.90x Prime @ 30% dip
@@ -259,6 +289,8 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
     primeKw: 400,
     ratedPowerFactor: 0.8,
     phase: 3,
+    supportedPhases: ['three'],
+    catalogStatus: 'production_verified',
     voltage: '415V 3-Phase',
     basePrice: 3480000,
     transientCapacityKva: 950, // 1.90x Prime @ 30% dip
@@ -267,10 +299,122 @@ export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
 ];
 
 /**
+ * Provisional single-phase generator catalog.
+ * 
+ * IMPORTANT: These ratings represent preliminary / reference test data
+ * grounded in commercial single-phase packaged DG configurations.
+ * They are explicitly isolated from verified production datasheets
+ * and tagged catalogStatus = 'provisional_reference'.
+ */
+export const PROVISIONAL_SINGLE_PHASE_CATALOG: GeneratorModel[] = [
+  {
+    id: 'gen-1p-5',
+    modelName: 'DG-5 kVA 1Φ (Provisional Reference)',
+    manufacturer: 'PowerGen / Stamford (Provisional)',
+    alternatorModel: 'Stamford SOL1-H1 (1-Phase)',
+    datasheetRef: 'Provisional reference test data - pending OEM manufacturer datasheet',
+    primeKva: 5,
+    standbyKva: 5.5,
+    primeKw: 4,
+    ratedPowerFactor: 0.8,
+    phase: 1,
+    supportedPhases: ['single'],
+    catalogStatus: 'provisional_reference',
+    isProvisional: true,
+    voltage: '230V 1-Phase',
+    basePrice: 165000,
+    transientCapacityKva: 9.5, // 1.90x Prime @ 30% dip (provisional estimate)
+    isActive: true,
+  },
+  {
+    id: 'gen-1p-7.5',
+    modelName: 'DG-7.5 kVA 1Φ (Provisional Reference)',
+    manufacturer: 'PowerGen / Stamford (Provisional)',
+    alternatorModel: 'Stamford SOL1-P1 (1-Phase)',
+    datasheetRef: 'Provisional reference test data - pending OEM manufacturer datasheet',
+    primeKva: 7.5,
+    standbyKva: 8.25,
+    primeKw: 6,
+    ratedPowerFactor: 0.8,
+    phase: 1,
+    supportedPhases: ['single'],
+    catalogStatus: 'provisional_reference',
+    isProvisional: true,
+    voltage: '230V 1-Phase',
+    basePrice: 195000,
+    transientCapacityKva: 14, // 1.87x Prime @ 30% dip (provisional estimate)
+    isActive: true,
+  },
+  {
+    id: 'gen-1p-10',
+    modelName: 'DG-10 kVA 1Φ (Provisional Reference)',
+    manufacturer: 'PowerGen / Stamford (Provisional)',
+    alternatorModel: 'Stamford SOL2-G1 (1-Phase)',
+    datasheetRef: 'Provisional reference test data - pending OEM manufacturer datasheet',
+    primeKva: 10,
+    standbyKva: 11,
+    primeKw: 8,
+    ratedPowerFactor: 0.8,
+    phase: 1,
+    supportedPhases: ['single'],
+    catalogStatus: 'provisional_reference',
+    isProvisional: true,
+    voltage: '230V 1-Phase',
+    basePrice: 225000,
+    transientCapacityKva: 18.5, // 1.85x Prime @ 30% dip (provisional estimate)
+    isActive: true,
+  },
+  {
+    id: 'gen-1p-12.5',
+    modelName: 'DG-12.5 kVA 1Φ (Provisional Reference)',
+    manufacturer: 'PowerGen / Stamford (Provisional)',
+    alternatorModel: 'Stamford SOL2-M1 (1-Phase)',
+    datasheetRef: 'Provisional reference test data - pending OEM manufacturer datasheet',
+    primeKva: 12.5,
+    standbyKva: 13.75,
+    primeKw: 10,
+    ratedPowerFactor: 0.8,
+    phase: 1,
+    supportedPhases: ['single'],
+    catalogStatus: 'provisional_reference',
+    isProvisional: true,
+    voltage: '230V 1-Phase',
+    basePrice: 245000,
+    transientCapacityKva: 23, // 1.84x Prime @ 30% dip (provisional estimate)
+    isActive: true,
+  },
+  {
+    id: 'gen-1p-15',
+    modelName: 'DG-15 kVA 1Φ (Provisional Reference)',
+    manufacturer: 'PowerGen / Stamford (Provisional)',
+    alternatorModel: 'Stamford SOL2-P1 (1-Phase)',
+    datasheetRef: 'Provisional reference test data - pending OEM manufacturer datasheet',
+    primeKva: 15,
+    standbyKva: 16.5,
+    primeKw: 12,
+    ratedPowerFactor: 0.8,
+    phase: 1,
+    supportedPhases: ['single'],
+    catalogStatus: 'provisional_reference',
+    isProvisional: true,
+    voltage: '230V 1-Phase',
+    basePrice: 265000,
+    transientCapacityKva: 27, // 1.80x Prime @ 30% dip (provisional estimate)
+    isActive: true,
+  },
+];
+
+export const STANDARD_GENERATOR_CATALOG: GeneratorModel[] = [
+  ...PRODUCTION_THREE_PHASE_CATALOG,
+  ...PROVISIONAL_SINGLE_PHASE_CATALOG,
+];
+
+/**
  * Matches generators based on:
  * 1. Required continuous Prime kVA & Prime kW (incorporating headroom reserve)
  * 2. Peak transient starting kVA capability (SKVA at 30% voltage dip)
  * 3. Minimum running kVA & kW coverage
+ * 4. System phase compatibility ('three' vs 'single')
  */
 export function matchGenerators(
   requiredPrimeKva: number,
@@ -278,7 +422,8 @@ export function matchGenerators(
   peakTransientKva: number,
   minimumRunningKva: number,
   minimumRunningKw: number,
-  catalog: GeneratorModel[] = STANDARD_GENERATOR_CATALOG
+  catalog: GeneratorModel[] = STANDARD_GENERATOR_CATALOG,
+  phaseFilter?: PhaseType
 ): {
   recommended: GeneratorModel | null;
   minimumAcceptable: GeneratorModel | null;
@@ -287,7 +432,14 @@ export function matchGenerators(
   runningLoadCandidate: GeneratorModel | null;
 } {
   const activeCatalog = catalog
-    .filter((g) => g.isActive)
+    .filter(
+      (g) =>
+        g.isActive &&
+        (!phaseFilter ||
+          (g.supportedPhases && g.supportedPhases.includes(phaseFilter)) ||
+          (phaseFilter === 'three' && g.phase === 3) ||
+          (phaseFilter === 'single' && g.phase === 1))
+    )
     .sort((a, b) => a.primeKva - b.primeKva);
 
   if (activeCatalog.length === 0 || (requiredPrimeKva <= 0 && requiredPrimeKw <= 0)) {
