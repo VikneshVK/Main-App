@@ -285,7 +285,10 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
             {/* 1. Smaller Candidate: Minimum Acceptable (if qualified) OR Undersized / Not Recommended (if failed) */}
             {summary.alternativeComparisons?.lower ? (
               summary.alternativeComparisons.lower.qualifies ? (
-                <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 text-xs">
+                <div
+                  key={`alt-lower-${summary.alternativeComparisons.lower.generator.id}-${summary.alternativeComparisons.lower.operatingMarginKw}-${summary.alternativeComparisons.lower.operatingMarginKva}`}
+                  className="p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 text-xs"
+                >
                   <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase flex items-center justify-between">
                     <span>Minimum Acceptable</span>
                     <Check className="w-3 h-3 text-emerald-500" />
@@ -296,9 +299,19 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
                   <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                     Passes continuous limits ({summary.alternativeComparisons.lower.governingMargin > 0 ? `+${summary.alternativeComparisons.lower.governingMargin}` : summary.alternativeComparisons.lower.governingMargin} {summary.alternativeComparisons.lower.governingConstraint} margin to {continuousLimitPercent}% limit)
                   </div>
+                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1.5 font-medium">
+                    Operating margin to {continuousLimitPercent}% limit:{' '}
+                    <strong>
+                      {summary.alternativeComparisons.lower.operatingMarginKw > 0 ? `+${summary.alternativeComparisons.lower.operatingMarginKw}` : summary.alternativeComparisons.lower.operatingMarginKw} kW
+                    </strong>{' '}
+                    ({summary.alternativeComparisons.lower.operatingMarginKva > 0 ? `+${summary.alternativeComparisons.lower.operatingMarginKva}` : summary.alternativeComparisons.lower.operatingMarginKva} kVA)
+                  </div>
                 </div>
               ) : (
-                <div className="p-3 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20 text-xs">
+                <div
+                  key={`alt-lower-${summary.alternativeComparisons.lower.generator.id}-${summary.alternativeComparisons.lower.operatingMarginKw}-${summary.alternativeComparisons.lower.operatingMarginKva}`}
+                  className="p-3 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20 text-xs"
+                >
                   <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase flex items-center justify-between">
                     <span>Undersized / Not Recommended</span>
                     <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
@@ -314,21 +327,27 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
                   </div>
                   <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5">
                     Operating margin to {continuousLimitPercent}% limit:{' '}
-                    <strong className="text-rose-600 dark:text-rose-400">
-                      {summary.alternativeComparisons.lower.operatingMarginKw} kW
+                    <strong className={summary.alternativeComparisons.lower.operatingMarginKw < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                      {summary.alternativeComparisons.lower.operatingMarginKw > 0 ? `+${summary.alternativeComparisons.lower.operatingMarginKw}` : summary.alternativeComparisons.lower.operatingMarginKw} kW
                     </strong>{' '}
-                    ({summary.alternativeComparisons.lower.operatingMarginKva} kVA)
+                    ({summary.alternativeComparisons.lower.operatingMarginKva > 0 ? `+${summary.alternativeComparisons.lower.operatingMarginKva}` : summary.alternativeComparisons.lower.operatingMarginKva} kVA)
                   </div>
                 </div>
               )
             ) : (
-              <div className="p-3 rounded-xl border border-dashed border-gray-200 dark:border-gray-800 text-xs flex items-center justify-center text-gray-400">
+              <div
+                key="alt-lower-none"
+                className="p-3 rounded-xl border border-dashed border-gray-200 dark:border-gray-800 text-xs flex items-center justify-center text-gray-400"
+              >
                 Lowest Catalog Step
               </div>
             )}
 
             {/* 2. Recommended Model */}
-            <div className="p-3 rounded-xl border-2 border-amber-500 bg-amber-50/30 dark:bg-amber-950/20 text-xs">
+            <div
+              key={`alt-rec-${recommended.id}-${summary.operatingMarginKw}-${summary.operatingMarginKva}`}
+              className="p-3 rounded-xl border-2 border-amber-500 bg-amber-50/30 dark:bg-amber-950/20 text-xs"
+            >
               <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase flex items-center justify-between">
                 <span>Recommended</span>
                 <Check className="w-3 h-3" />
@@ -340,19 +359,28 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
                 Optimal balance of longevity, motor surge, & headroom
               </div>
               <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
-                Margin to {continuousLimitPercent}% limit: +{summary.operatingMarginKw} kW (+{summary.operatingMarginKva} kVA)
+                Margin to {continuousLimitPercent}% limit:{' '}
+                <strong className={summary.operatingMarginKw < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                  {summary.operatingMarginKw > 0 ? `+${summary.operatingMarginKw}` : summary.operatingMarginKw} kW
+                </strong>{' '}
+                ({summary.operatingMarginKva > 0 ? `+${summary.operatingMarginKva}` : summary.operatingMarginKva} kVA)
               </div>
             </div>
 
             {/* 3. Heavy Duty */}
             {summary.alternativeComparisons?.heavyDuty ? (
-              <div className="p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 text-xs">
+              <div
+                key={`alt-hd-${summary.alternativeComparisons.heavyDuty.generator.id}-${summary.alternativeComparisons.heavyDuty.operatingMarginKw}-${summary.alternativeComparisons.heavyDuty.operatingMarginKva}`}
+                className="p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 text-xs"
+              >
                 <div className="text-[10px] font-bold text-gray-400 uppercase flex items-center justify-between">
                   <span className="flex items-center gap-1">
                     <span>Heavy-Duty / Future</span>
                     <TrendingUp className="w-3 h-3 text-blue-500" />
                   </span>
-                  <span className="text-emerald-600 dark:text-emerald-400 text-[10px] font-mono">Passes</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 text-[10px] font-mono">
+                    {summary.alternativeComparisons.heavyDuty.qualifies ? 'Passes' : 'Surge Exceeded'}
+                  </span>
                 </div>
                 <div className="font-bold text-gray-900 dark:text-white mt-0.5">
                   {summary.alternativeComparisons.heavyDuty.generator.primeKva} kVA
@@ -361,11 +389,18 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
                   Provides high expansion headroom for future equipment
                 </div>
                 <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
-                  Margin to {continuousLimitPercent}% limit: +{summary.alternativeComparisons.heavyDuty.operatingMarginKw} kW (+{summary.alternativeComparisons.heavyDuty.operatingMarginKva} kVA)
+                  Margin to {continuousLimitPercent}% limit:{' '}
+                  <strong className={summary.alternativeComparisons.heavyDuty.operatingMarginKw < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                    {summary.alternativeComparisons.heavyDuty.operatingMarginKw > 0 ? `+${summary.alternativeComparisons.heavyDuty.operatingMarginKw}` : summary.alternativeComparisons.heavyDuty.operatingMarginKw} kW
+                  </strong>{' '}
+                  ({summary.alternativeComparisons.heavyDuty.operatingMarginKva > 0 ? `+${summary.alternativeComparisons.heavyDuty.operatingMarginKva}` : summary.alternativeComparisons.heavyDuty.operatingMarginKva} kVA)
                 </div>
               </div>
             ) : (
-              <div className="p-3 rounded-xl border border-dashed border-gray-200 dark:border-gray-800 text-xs flex items-center justify-center text-gray-400">
+              <div
+                key="alt-hd-none"
+                className="p-3 rounded-xl border border-dashed border-gray-200 dark:border-gray-800 text-xs flex items-center justify-center text-gray-400"
+              >
                 Highest Catalog Step
               </div>
             )}

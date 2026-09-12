@@ -119,6 +119,7 @@ export interface AlternativeComparisonItem {
   continuousLimitKw: number;
   operatingMarginKva: number;
   operatingMarginKw: number;
+  transientMarginKva: number;
   governingMargin: number;
   governingConstraint: 'kW' | 'kVA';
   failureReason?: string;

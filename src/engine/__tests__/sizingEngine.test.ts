@@ -757,5 +757,100 @@ describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () 
       expect(result.summary.alternativeComparisons.heavyDuty?.operatingMarginKw).toBe(4.8);
       expect(result.summary.alternativeComparisons.heavyDuty?.operatingMarginKva).toBe(6.0);
     });
+
+    it('Scenario 7: Exact Test 3 Case - Ensures catalog alternatives dynamically update margins from active demand and never retain stale values', () => {
+      // Test 3 Scenario:
+      // Load configuration: Connected demand = 13.77 kW. When diversity is ON in Office profile -> 10.77 kW.
+      // E.g. Load 1: 12.0 kW General (0.75 factor in Office -> 9.0 kW)
+      //      Load 2: 1.77 kW Custom (1.00 factor in Office -> 1.77 kW)
+      // Total Connected = 13.77 kW / 13.77 kVA (at PF 1.0)
+      // Total Diversified = 10.77 kW / 10.77 kVA
+      const test3Loads: LoadItem[] = [
+        {
+          id: 'test3-load-1',
+          name: 'General Commercial Loads',
+          category: 'General',
+          quantity: 1,
+          unitPower: 12.0,
+          powerUnit: 'kW',
+          powerFactor: 1.0,
+          isMotor: false,
+          startingMethod: 'None',
+          confidence: 'Nameplate',
+        },
+        {
+          id: 'test3-load-2',
+          name: 'Dedicated Servers',
+          category: 'Custom',
+          quantity: 1,
+          unitPower: 1.77,
+          powerUnit: 'kW',
+          powerFactor: 1.0,
+          isMotor: false,
+          startingMethod: 'None',
+          confidence: 'Nameplate',
+          demandFactor: 1.0,
+        },
+      ];
+
+      // Configuration 1: Demand Diversity ON
+      const resultDiversityOn = calculateGeneratorSizing(test3Loads, {
+        facilityType: 'Office',
+        applyDiversity: true,
+        headroomPercent: 20,
+      });
+
+      expect(resultDiversityOn.summary.totalDiversifiedKw).toBe(10.77);
+      expect(resultDiversityOn.summary.totalDiversifiedKva).toBe(10.77);
+      // At 20% headroom, required Prime kW = 10.77 / 0.8 = 13.46 kW.
+      // gen-20 has primeKw = 16 kW (80% limit = 12.8 kW) -> QUALIFIED and RECOMMENDED!
+      expect(resultDiversityOn.summary.recommendedGenerator?.id).toBe('gen-20');
+      expect(resultDiversityOn.summary.operatingMarginKw).toBe(2.03); // 12.8 - 10.77 = +2.03 kW
+
+      // Configuration 2: Demand Diversity OFF (Test 3 Reported Case)
+      const resultDiversityOff = calculateGeneratorSizing(test3Loads, {
+        facilityType: 'Office',
+        applyDiversity: false,
+        headroomPercent: 20,
+      });
+
+      expect(resultDiversityOff.summary.totalConnectedKw).toBe(13.77);
+      expect(resultDiversityOff.summary.totalDiversifiedKw).toBe(13.77);
+      expect(resultDiversityOff.summary.totalDiversifiedKva).toBe(13.77);
+
+      // At 20% headroom, required Prime kW = 13.77 / 0.8 = 17.21 kW.
+      // 20 kVA generator has Prime = 16 kW, 80% continuous limit = 12.8 kW.
+      // Correct margin = 12.8 - 13.77 = -0.97 kW.
+      // 20 kVA is disqualified and steps up to 25 kVA (Prime 20 kW, 80% limit 16.0 kW).
+      expect(resultDiversityOff.summary.recommendedGenerator?.id).toBe('gen-25');
+      expect(resultDiversityOff.summary.operatingMarginKw).toBe(2.23); // 16.0 - 13.77 = +2.23 kW
+
+      // Audit Alternative Cards for Stale Values:
+      // The 20 kVA generator is now the 'lower' candidate.
+      const lower = resultDiversityOff.summary.alternativeComparisons.lower;
+      expect(lower).toBeDefined();
+      expect(lower?.generator.id).toBe('gen-20');
+      expect(lower?.qualifies).toBe(false);
+      expect(lower?.label).toBe('Undersized / Not Recommended');
+
+      // Failure reason correctly reports 0.97 kW deficit
+      expect(lower?.failureReason).toContain(
+        'Exceeds 80% continuous engine limit by 0.97 kW (Limit: 12.8 kW, Demand: 13.77 kW)'
+      );
+
+      // CRITICAL: Operating margin MUST be recalculated from active 13.77 kW demand:
+      // Must be -0.97 kW, NEVER retaining stale +2.03 kW from the previous diversified state!
+      expect(lower?.operatingMarginKw).toBe(-0.97);
+      expect(lower?.operatingMarginKva).toBe(2.23); // 16.0 - 13.77 = 2.23 kVA
+      expect(lower?.transientMarginKva).toBeGreaterThan(0);
+
+      // Verify Heavy Duty alternative (30 kVA, Prime 24 kW / 80% limit 19.2 kW)
+      const heavyDuty = resultDiversityOff.summary.alternativeComparisons.heavyDuty;
+      expect(heavyDuty).toBeDefined();
+      expect(heavyDuty?.generator.id).toBe('gen-30');
+      expect(heavyDuty?.qualifies).toBe(true);
+      expect(heavyDuty?.operatingMarginKw).toBe(5.43); // 19.2 - 13.77
+      expect(heavyDuty?.operatingMarginKva).toBe(10.23); // 24.0 - 13.77
+    });
   });
 });
