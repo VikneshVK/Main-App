@@ -37,9 +37,11 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
   }
 
   // Calculate percentage utilization
-  const utilizationPercent = Math.min(
-    100,
-    Math.round((summary.totalDiversifiedKva / recommended.primeKva) * 100)
+  const continuousLimitPercent = 100 - summary.headroomPercent;
+  const isOverLimit = summary.operatingMarginKva < 0;
+  const marginBarWidth = Math.max(
+    0,
+    continuousLimitPercent - summary.continuousLoadUtilizationPercent
   );
 
   const confidenceBadge = {
@@ -82,7 +84,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
             </h2>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 space-y-0.5">
               <div>
-                {recommended.modelName} • Prime: {recommended.primeKw} kW • Standby: {recommended.standbyKva} kVA • {recommended.voltage}
+                {recommended.modelName} • Prime: {recommended.primeKva} kVA ({recommended.primeKw} kW) • Standby: {recommended.standbyKva} kVA • {recommended.voltage}
               </div>
               {recommended.alternatorModel && (
                 <div className="text-[11px] font-mono text-gray-400">
@@ -105,39 +107,92 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
         </div>
 
         {/* Headroom / Capacity Bar */}
-        <div className="mt-5 space-y-2">
-          <div className="flex items-center justify-between text-xs font-medium text-gray-700 dark:text-gray-300">
+        <div className="mt-5 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between text-xs font-medium text-gray-700 dark:text-gray-300 gap-y-1">
             <span>
-              Estimated Requirement:{' '}
+              Operating Demand:{' '}
               <strong className="text-gray-900 dark:text-white">
                 {summary.totalDiversifiedKva} kVA
               </strong>
             </span>
             <span>
-              Generator Capacity:{' '}
+              Continuous Limit ({continuousLimitPercent}%):{' '}
+              <strong className="text-gray-900 dark:text-white">
+                {summary.continuousOperatingLimitKva} kVA
+              </strong>
+            </span>
+            <span>
+              Prime Rating:{' '}
               <strong className="text-gray-900 dark:text-white">
                 {recommended.primeKva} kVA
               </strong>
             </span>
-            <span>
-              Reserve Headroom:{' '}
-              <strong className="text-amber-600 dark:text-amber-400">
-                {summary.availableHeadroomKva} kVA ({100 - utilizationPercent}%)
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between text-xs font-semibold pt-1 border-t border-gray-200/60 dark:border-gray-700/40">
+            <span className="text-gray-600 dark:text-gray-300">
+              Continuous Load Utilization:{' '}
+              <strong
+                className={
+                  isOverLimit
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-amber-600 dark:text-amber-400'
+                }
+              >
+                {summary.continuousLoadUtilizationPercent}% of Prime
+              </strong>
+            </span>
+            <span
+              className={
+                isOverLimit
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-emerald-600 dark:text-emerald-400'
+              }
+            >
+              Operating Margin to {continuousLimitPercent}% Prime Limit:{' '}
+              <strong>
+                {summary.operatingMarginKva > 0
+                  ? `+${summary.operatingMarginKva}`
+                  : summary.operatingMarginKva}{' '}
+                kVA
               </strong>
             </span>
           </div>
 
-          <div className="h-3 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden flex p-0.5">
+          {/* Visual Progress Bar */}
+          <div className="h-3 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden flex p-0.5 relative">
+            {/* 1. Demand segment */}
             <div
-              className="h-full bg-amber-500 rounded-full transition-all duration-300"
-              style={{ width: `${utilizationPercent}%` }}
-              title={`Running Load: ${utilizationPercent}% of Prime`}
+              className={`h-full rounded-l-full transition-all duration-300 ${
+                isOverLimit ? 'bg-red-500' : 'bg-amber-500'
+              }`}
+              style={{
+                width: `${Math.min(100, summary.continuousLoadUtilizationPercent)}%`,
+              }}
+              title={`Demand: ${summary.continuousLoadUtilizationPercent}% of Prime`}
             />
+            {/* 2. Margin segment up to continuous limit */}
+            {marginBarWidth > 0 && (
+              <div
+                className="h-full bg-emerald-400/80 dark:bg-emerald-500/60 transition-all duration-300 ml-0.5"
+                style={{ width: `${marginBarWidth}%` }}
+                title={`Operating Margin: ${summary.operatingMarginKva} kVA before ${continuousLimitPercent}% limit`}
+              />
+            )}
+            {/* 3. Reserved Headroom buffer */}
             <div
-              className="h-full bg-emerald-400/70 dark:bg-emerald-500/50 rounded-full transition-all duration-300 ml-0.5"
-              style={{ width: `${100 - utilizationPercent}%` }}
-              title={`Available Headroom: ${100 - utilizationPercent}%`}
+              className="h-full bg-gray-300/60 dark:bg-gray-700/60 rounded-r-full transition-all duration-300 ml-0.5 border-l border-gray-400/40 dark:border-gray-600/40"
+              style={{ width: `${summary.headroomPercent}%` }}
+              title={`Reserved Headroom Buffer: ${summary.headroomPercent}% (Loading capped at ${continuousLimitPercent}%)`}
             />
+          </div>
+
+          <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+            <span>0%</span>
+            <span className="text-gray-500 dark:text-gray-400 font-medium">
+              ▲ {continuousLimitPercent}% Limit ({summary.continuousOperatingLimitKva} kVA)
+            </span>
+            <span>100% Prime ({recommended.primeKva} kVA)</span>
           </div>
         </div>
       </div>

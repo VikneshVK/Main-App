@@ -133,10 +133,14 @@ export interface SizingResult {
     largestMotorName?: string;
     peakTransientKva: number;
     
-    // Headroom & sizing
+    // Headroom & Continuous Operating Limits
     headroomPercent: number;
     requiredPrimeKva: number;
-    availableHeadroomKva: number;
+    continuousOperatingLimitKva: number;
+    continuousLoadUtilizationPercent: number;
+    operatingMarginKva: number;
+    operatingMarginPercent: number;
+    availableHeadroomKva: number; // Kept for backwards compatibility (equals operatingMarginKva)
     
     // Recommendations
     recommendedGenerator: GeneratorModel | null;

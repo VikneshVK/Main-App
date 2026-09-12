@@ -6,6 +6,7 @@ import {
   vectorPowerSum,
   calculateStartingKva,
   LoadItem,
+  GeneratorModel,
   CURRENT_ENGINE_VERSION,
 } from '../index';
 
@@ -300,6 +301,172 @@ describe('GenQuote Load Calculation Engine (IEEE 399 / NEMA MG-1 Grounded)', () 
       expect(result.summary.totalConnectedKw).toBeCloseTo(13.2, 1);
       expect(result.summary.totalDiversifiedKw).toBeGreaterThan(0);
       expect(result.summary.recommendedGenerator).not.toBeNull();
+    });
+  });
+
+  describe('Generator Headroom & Continuous Operating Margin Audit', () => {
+    const testGen15With12Prime: GeneratorModel = {
+      id: 'test-gen-15-12',
+      modelName: 'DG-15 kVA (12 kVA Prime)',
+      manufacturer: 'PowerGen',
+      primeKva: 12,
+      standbyKva: 15,
+      primeKw: 9.6,
+      phase: 3,
+      voltage: '415V 3-Phase',
+      transientCapacityKva: 24,
+      isActive: true,
+    };
+
+    const testGen100: GeneratorModel = {
+      id: 'test-gen-100',
+      modelName: 'DG-100 kVA',
+      manufacturer: 'PowerGen',
+      primeKva: 100,
+      standbyKva: 110,
+      primeKw: 80,
+      phase: 3,
+      voltage: '415V 3-Phase',
+      transientCapacityKva: 190,
+      isActive: true,
+    };
+
+    const createPureLoad = (kva: number): LoadItem => ({
+      id: `load-${kva}`,
+      name: `${kva} kVA Resistive Test Load`,
+      category: 'Custom',
+      quantity: 1,
+      unitPower: kva,
+      powerUnit: 'kVA',
+      powerFactor: 1.0,
+      isMotor: false,
+      startingMethod: 'None',
+      confidence: 'Nameplate',
+      demandFactor: 1.0,
+    });
+
+    it('Test 1: 15 kVA generator with 12 kVA Prime and 7.5 kVA demand at 20% headroom', () => {
+      const result = calculateGeneratorSizing(
+        [createPureLoad(7.5)],
+        { headroomPercent: 20 },
+        [testGen15With12Prime]
+      );
+
+      expect(result.summary.recommendedGenerator?.primeKva).toBe(12);
+      expect(result.summary.continuousOperatingLimitKva).toBe(9.6);
+      expect(result.summary.continuousLoadUtilizationPercent).toBe(62.5);
+      expect(result.summary.operatingMarginKva).toBe(2.1);
+      expect(result.summary.operatingMarginPercent).toBe(17.5);
+
+      // Verify rationale matches requested format and eliminates misleading 50% claim
+      expect(
+        result.summary.rationale.some((r) =>
+          r.includes(
+            'Operates at 62.5% of Prime capacity, leaving 2.1 kVA before the 80% continuous operating limit.'
+          )
+        )
+      ).toBe(true);
+
+      expect(
+        result.summary.rationale.some((r) => r.includes('Provides 50% operating headroom'))
+      ).toBe(false);
+    });
+
+    it('Test 2: Demand exactly at 80% of Prime (80 kVA on 100 kVA Prime)', () => {
+      const result = calculateGeneratorSizing(
+        [createPureLoad(80)],
+        { headroomPercent: 20 },
+        [testGen100]
+      );
+
+      expect(result.summary.continuousOperatingLimitKva).toBe(80);
+      expect(result.summary.continuousLoadUtilizationPercent).toBe(80);
+      expect(result.summary.operatingMarginKva).toBe(0);
+      expect(
+        result.summary.rationale.some((r) =>
+          r.includes(
+            'Operates at 80% of Prime capacity, exactly matching the 80% continuous operating limit.'
+          )
+        )
+      ).toBe(true);
+    });
+
+    it('Test 3: Demand above 80% of Prime (85 kVA on 100 kVA Prime)', () => {
+      const result = calculateGeneratorSizing(
+        [createPureLoad(85)],
+        { headroomPercent: 20 },
+        [testGen100]
+      );
+
+      expect(result.summary.continuousOperatingLimitKva).toBe(80);
+      expect(result.summary.continuousLoadUtilizationPercent).toBe(85);
+      expect(result.summary.operatingMarginKva).toBe(-5);
+      expect(
+        result.summary.rationale.some((r) =>
+          r.includes(
+            'Operates at 85% of Prime capacity, exceeding the 80% continuous operating limit by 5 kVA.'
+          )
+        )
+      ).toBe(true);
+
+      expect(
+        result.summary.warnings.some((w) =>
+          w.includes('exceeds the 80% continuous limit')
+        )
+      ).toBe(true);
+    });
+
+    it('Test 4: Different headroom settings (10%, 20%, and 30% with 60 kVA demand on 100 kVA Prime)', () => {
+      // At 10% headroom -> continuous limit = 90 kVA (90%), margin = 30 kVA
+      const res10 = calculateGeneratorSizing(
+        [createPureLoad(60)],
+        { headroomPercent: 10 },
+        [testGen100]
+      );
+      expect(res10.summary.continuousOperatingLimitKva).toBe(90);
+      expect(res10.summary.operatingMarginKva).toBe(30);
+      expect(res10.summary.continuousLoadUtilizationPercent).toBe(60);
+      expect(
+        res10.summary.rationale.some((r) =>
+          r.includes(
+            'Operates at 60% of Prime capacity, leaving 30 kVA before the 90% continuous operating limit.'
+          )
+        )
+      ).toBe(true);
+
+      // At 20% headroom -> continuous limit = 80 kVA (80%), margin = 20 kVA
+      const res20 = calculateGeneratorSizing(
+        [createPureLoad(60)],
+        { headroomPercent: 20 },
+        [testGen100]
+      );
+      expect(res20.summary.continuousOperatingLimitKva).toBe(80);
+      expect(res20.summary.operatingMarginKva).toBe(20);
+      expect(res20.summary.continuousLoadUtilizationPercent).toBe(60);
+      expect(
+        res20.summary.rationale.some((r) =>
+          r.includes(
+            'Operates at 60% of Prime capacity, leaving 20 kVA before the 80% continuous operating limit.'
+          )
+        )
+      ).toBe(true);
+
+      // At 30% headroom -> continuous limit = 70 kVA (70%), margin = 10 kVA
+      const res30 = calculateGeneratorSizing(
+        [createPureLoad(60)],
+        { headroomPercent: 30 },
+        [testGen100]
+      );
+      expect(res30.summary.continuousOperatingLimitKva).toBe(70);
+      expect(res30.summary.operatingMarginKva).toBe(10);
+      expect(res30.summary.continuousLoadUtilizationPercent).toBe(60);
+      expect(
+        res30.summary.rationale.some((r) =>
+          r.includes(
+            'Operates at 60% of Prime capacity, leaving 10 kVA before the 70% continuous operating limit.'
+          )
+        )
+      ).toBe(true);
     });
   });
 });

@@ -194,17 +194,43 @@ export function calculateGeneratorSizing(
     catalog
   );
 
-  const availableHeadroomKva = recommended
-    ? round(Math.max(0, recommended.primeKva - totalDiversifiedKva), 1)
+  // The generator evaluated for continuous headroom is the recommended unit,
+  // or the minimum acceptable unit if no generator satisfies the full headroom reserve.
+  const evalGenerator = recommended ?? minimumAcceptable;
+
+  // Continuous operating limit based on Prime capacity and headroom setting:
+  // continuousLimit = Prime * (1 - headroomPercent/100)
+  const continuousLimitRatio = 1 - config.headroomPercent / 100;
+  const continuousOperatingLimitKva = evalGenerator
+    ? round(evalGenerator.primeKva * continuousLimitRatio, 2)
     : 0;
+
+  // Continuous Load Utilization (% of Prime):
+  // utilization = (operatingDemand / Prime) * 100
+  const continuousLoadUtilizationPercent = evalGenerator && evalGenerator.primeKva > 0
+    ? round((totalDiversifiedKva / evalGenerator.primeKva) * 100, 1)
+    : 0;
+
+  // Operating Margin to continuous operating limit:
+  // operatingMargin = continuousLimit - operatingDemand
+  const operatingMarginKva = evalGenerator
+    ? round(continuousOperatingLimitKva - totalDiversifiedKva, 2)
+    : 0;
+
+  const operatingMarginPercent = evalGenerator && evalGenerator.primeKva > 0
+    ? round((operatingMarginKva / evalGenerator.primeKva) * 100, 1)
+    : 0;
+
+  // availableHeadroomKva represents the operating margin to continuous limit
+  const availableHeadroomKva = operatingMarginKva;
 
   // Evaluate recommendation confidence and warnings
   const confidenceEval = evaluateConfidence(
     loads,
-    recommended,
+    evalGenerator,
     totalDiversifiedKva,
     transientResult.peakTransientKva,
-    availableHeadroomKva,
+    operatingMarginKva,
     config.headroomPercent
   );
 
@@ -286,6 +312,10 @@ export function calculateGeneratorSizing(
 
       headroomPercent: config.headroomPercent,
       requiredPrimeKva,
+      continuousOperatingLimitKva,
+      continuousLoadUtilizationPercent,
+      operatingMarginKva,
+      operatingMarginPercent,
       availableHeadroomKva,
 
       recommendedGenerator: recommended,

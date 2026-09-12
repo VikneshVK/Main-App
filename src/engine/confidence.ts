@@ -13,8 +13,8 @@ export function evaluateConfidence(
   recommendedGen: GeneratorModel | null,
   diversifiedKva: number,
   peakTransientKva: number,
-  headroomKva: number,
-  _headroomPercent: number
+  _headroomKva: number,
+  headroomPercent: number
 ): ConfidenceEvaluation {
   const warnings: string[] = [];
   const rationale: string[] = [];
@@ -61,8 +61,30 @@ export function evaluateConfidence(
       rationale.push('Provides stable power for linear/steady-state loads');
     }
 
-    const actualHeadroomPercent = round(((recommendedGen.primeKva - diversifiedKva) / recommendedGen.primeKva) * 100, 1);
-    rationale.push(`Provides ${actualHeadroomPercent}% operating headroom (${round(headroomKva, 1)} kVA reserve)`);
+    const continuousLimitRatio = 1 - headroomPercent / 100;
+    const continuousOperatingLimit = round(recommendedGen.primeKva * continuousLimitRatio, 2);
+    const continuousLimitPercent = Math.round(continuousLimitRatio * 100);
+    const utilizationPercent = round((diversifiedKva / recommendedGen.primeKva) * 100, 1);
+    const operatingMarginKva = round(continuousOperatingLimit - diversifiedKva, 2);
+
+    if (operatingMarginKva > 0) {
+      rationale.push(
+        `Operates at ${utilizationPercent}% of Prime capacity, leaving ${operatingMarginKva} kVA before the ${continuousLimitPercent}% continuous operating limit.`
+      );
+    } else if (operatingMarginKva === 0) {
+      rationale.push(
+        `Operates at ${utilizationPercent}% of Prime capacity, exactly matching the ${continuousLimitPercent}% continuous operating limit.`
+      );
+    } else {
+      const deficitKva = round(Math.abs(operatingMarginKva), 2);
+      rationale.push(
+        `Operates at ${utilizationPercent}% of Prime capacity, exceeding the ${continuousLimitPercent}% continuous operating limit by ${deficitKva} kVA.`
+      );
+      warnings.push(
+        `Continuous loading alert: Operating demand (${round(diversifiedKva, 1)} kVA) exceeds the ${continuousLimitPercent}% continuous limit (${continuousOperatingLimit} kVA).`
+      );
+      score -= 20;
+    }
 
     // Check if starting surge is close to transient limit
     if (peakTransientKva > recommendedGen.transientCapacityKva * 0.85) {
